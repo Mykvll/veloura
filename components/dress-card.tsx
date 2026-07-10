@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 
 /**
  * The exact shape a DressCard needs. We keep this narrow (not the whole DB row)
@@ -25,7 +26,11 @@ export type DressCardData = {
  */
 export function DressCard({ dress }: { dress: DressCardData }) {
   return (
-    <article className="overflow-hidden rounded-lg border border-border-soft bg-background-card shadow-card">
+    // The whole card links through to the dress-detail page (/dress/[id]).
+    <Link
+      href={`/dress/${dress.id}`}
+      className="block overflow-hidden rounded-lg border border-border-soft bg-background-card shadow-card transition-fast hover:shadow-float focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-brand-primary/35"
+    >
       {/* Cover photo. Fixed 3:4 portrait frame keeps the grid tidy even when
           source photos vary in size. */}
       <div className="relative aspect-[3/4] w-full bg-background-panel">
@@ -63,6 +68,6 @@ export function DressCard({ dress }: { dress: DressCardData }) {
           <span className="text-body-sm text-text-secondary">(2 days)</span>
         </p>
       </div>
-    </article>
+    </Link>
   );
 }
