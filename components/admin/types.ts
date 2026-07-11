@@ -40,6 +40,39 @@ export type AdminAccessory = {
   imageUrl: string | null;
 };
 
+/**
+ * The plain, serializable shape of a payment channel as the admin UI works with
+ * it. Maps 1:1 to the `payment_methods` table (name = e.g. "GCash", qrUrl = the
+ * public URL of its QR image, or null until one is uploaded).
+ */
+export type AdminPaymentMethod = {
+  id: string;
+  name: string;
+  /** Public URL of the QR image in the dress-photos bucket, or null. */
+  qrUrl: string | null;
+};
+
+/**
+ * A rental booking as the admin Bookings & Payments section works with it. The
+ * server page shapes the raw row and swaps the private `proof_url` storage path
+ * for a short-lived SIGNED URL the browser can actually load.
+ */
+export type AdminBooking = {
+  id: string;
+  renter: string;
+  dress: string;
+  contact: string;
+  /** Rental dates + preferred delivery time (ISO days / "10:00 AM"). */
+  start: string | null;
+  end: string | null;
+  deliver: string | null;
+  amount: number;
+  /** 'none' | 'pending' | 'verified' | 'invalid'. */
+  status: string;
+  /** Signed URL of the payment screenshot, or null if none was uploaded. */
+  proofUrl: string | null;
+};
+
 /** The sizes a dress can be offered in, in display order. */
 export const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL"] as const;
 

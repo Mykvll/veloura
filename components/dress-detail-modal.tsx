@@ -10,8 +10,9 @@ import {
   AvailabilityCalendar,
   type BlockedDate,
 } from "./availability-calendar";
-import { RentForm } from "./reserve/rent-form";
+import { RentForm, type RentContinueData } from "./reserve/rent-form";
 import { FittingForm } from "./reserve/fitting-form";
+import { PaymentStep, type PaymentOption } from "./reserve/payment-step";
 import { niceDate } from "@/lib/reserve";
 
 /** One renter review, already shaped for display. */
@@ -54,6 +55,7 @@ export type DressDetail = {
 export function DressDetailModal({
   dress,
   accessories,
+  paymentMethods,
   blockedDates,
   fittingsBooked,
   onClose,
@@ -62,6 +64,8 @@ export function DressDetailModal({
   /** The add-on accessories offered in the reserve flow (same list for every
    *  dress). */
   accessories: CustomerAccessory[];
+  /** The payment channels (with QR images) offered in the payment step. */
+  paymentMethods: PaymentOption[];
   /** Blocked (rental + wash) days across all dresses, for the date calendar. */
   blockedDates: BlockedDate[];
   /** Already-taken fitting times, keyed by date, for the fitting form. */
@@ -69,11 +73,19 @@ export function DressDetailModal({
   onClose: () => void;
 }) {
   // The wizard step. "details" is the dress page; "date" is the calendar +
-  // reserve/fitting form (reached by Reserve / Book-a-fitting); "done" is the
-  // confirmation after the booking is saved. `mode` picks rent vs fitting.
-  const [step, setStep] = useState<"details" | "date" | "done">("details");
+  // reserve/fitting form (reached by Reserve / Book-a-fitting); "payment" is the
+  // rent-only payment step; "done" is the confirmation after the booking is
+  // saved. `mode` picks rent vs fitting.
+  const [step, setStep] = useState<"details" | "date" | "payment" | "done">(
+    "details",
+  );
   const [mode, setMode] = useState<"rent" | "fitting">("rent");
   const [date, setDate] = useState<string | null>(null);
+
+  // The rent details carried from the form into the payment step (the booking
+  // isn't saved until payment proof is submitted). Null until "Continue to
+  // payment" is pressed.
+  const [payment, setPayment] = useState<RentContinueData | null>(null);
 
   // Open the calendar in the requested mode, clearing any earlier pick.
   const goToDate = (m: "rent" | "fitting") => {
@@ -82,15 +94,21 @@ export function DressDetailModal({
     setStep("date");
   };
 
+  // The payment step must not be dismissable by Esc or clicking outside — only
+  // the explicit Cancel button (with a warning) exits it.
+  const locked = step === "payment";
+
   // The header subtitle tracks the step (prototype's subtitleMap).
   const subtitle =
     step === "done"
       ? "Reservation received"
-      : step === "date"
-        ? mode === "fitting"
-          ? "Reserve a date — fitting"
-          : "Reserve a date"
-        : dress.styleName;
+      : step === "payment"
+        ? "Payment"
+        : step === "date"
+          ? mode === "fitting"
+            ? "Reserve a date — fitting"
+            : "Reserve a date"
+          : dress.styleName;
 
   return (
     <Dialog.Root open onOpenChange={(o) => !o && onClose()}>
@@ -98,6 +116,10 @@ export function DressDetailModal({
         <Dialog.Overlay className="fixed inset-0 z-50 bg-overlay-scrim" />
         <Dialog.Content
           aria-describedby={undefined}
+          // During the payment step, block the built-in dismissals (Esc,
+          // click/focus outside) so the only way out is the explicit Cancel.
+          onEscapeKeyDown={(e) => locked && e.preventDefault()}
+          onInteractOutside={(e) => locked && e.preventDefault()}
           // Mobile: a bottom sheet pinned to the bottom edge with rounded top
           // corners. Desktop (md+): a centered card, up to 920px wide.
           className="fixed inset-x-0 bottom-0 z-50 flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-lg border border-border-soft bg-background-card shadow-float md:inset-auto md:left-1/2 md:top-1/2 md:bottom-auto md:w-[min(920px,94vw)] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-lg"
@@ -112,18 +134,22 @@ export function DressDetailModal({
                 <p className="text-body-sm text-text-secondary">{subtitle}</p>
               ) : null}
             </div>
-            <Dialog.Close
-              aria-label="Close"
-              className="min-h-tap min-w-tap rounded-sm text-2xl leading-none text-text-secondary hover:text-text-heading focus-visible:shadow-focus"
-            >
-              ✕
-            </Dialog.Close>
+            {/* No close ✕ on the payment step — Cancel (with a warning) is the
+                only way out. */}
+            {locked ? null : (
+              <Dialog.Close
+                aria-label="Close"
+                className="min-h-tap min-w-tap rounded-sm text-2xl leading-none text-text-secondary hover:text-text-heading focus-visible:shadow-focus"
+              >
+                ✕
+              </Dialog.Close>
+            )}
           </div>
 
           {/* Body — scrolls within the modal */}
           <div className="flex-1 overflow-y-auto px-6 py-6">
             {step === "done" ? (
-              // Step 3: confirmation after the booking is saved (pending).
+              // Final step: confirmation after the booking is saved (pending).
               <div className="mx-auto flex max-w-md flex-col items-center gap-3.5 py-4 text-center">
                 <span className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-primary text-3xl leading-none text-text-on-primary">
                   ✓
@@ -155,6 +181,18 @@ export function DressDetailModal({
                   Back to the collection
                 </button>
               </div>
+            ) : step === "payment" && payment ? (
+              // Step 3 (rent only): pay the amount due and submit proof. This is
+              // where the booking row is actually written.
+              <PaymentStep
+                dressName={dress.name}
+                date={payment.input.date}
+                total={payment.total}
+                methods={paymentMethods}
+                input={payment.input}
+                onPaid={() => setStep("done")}
+                onCancel={onClose}
+              />
             ) : step === "date" ? (
               // Step 2: pick a date (left) and fill the reserve/fitting form
               // (right) — the prototype's split "Reserve a date" step.
@@ -186,7 +224,10 @@ export function DressDetailModal({
                       }}
                       accessories={accessories}
                       date={date}
-                      onDone={() => setStep("done")}
+                      onContinue={(data) => {
+                        setPayment(data);
+                        setStep("payment");
+                      }}
                     />
                   ) : (
                     <FittingForm

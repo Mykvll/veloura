@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { CollectionGallery } from "@/components/collection-gallery";
 import type { DressDetail } from "@/components/dress-detail-modal";
 import type { CustomerAccessory } from "@/components/accessory-picker";
+import type { PaymentOption } from "@/components/reserve/payment-step";
 import type { BlockedDate } from "@/components/availability-calendar";
 
 // Always fetch fresh from Supabase on each request (no static caching), so new
@@ -41,6 +42,20 @@ export default async function Home() {
     price: a.price,
     stock: a.stock,
     imageUrl: a.image_url,
+  }));
+
+  // Payment channels for the reserve flow's payment step, in the order the admin
+  // set (sort_order, then creation). Each carries its QR image URL (or null).
+  const { data: paymentRows } = await supabase
+    .from("payment_methods")
+    .select("id, name, qr_url")
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  const paymentMethods: PaymentOption[] = (paymentRows ?? []).map((m) => ({
+    id: m.id,
+    name: m.name,
+    qrUrl: m.qr_url,
   }));
 
   // Blocked days for the reserve-flow calendar. The `blocked_dates` view already
@@ -130,6 +145,7 @@ export default async function Home() {
         <CollectionGallery
           dresses={cards}
           accessories={accessories}
+          paymentMethods={paymentMethods}
           blockedDates={blockedDates}
           fittingsBooked={fittingsBooked}
         />

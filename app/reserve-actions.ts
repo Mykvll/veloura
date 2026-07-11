@@ -39,6 +39,10 @@ export type RentBookingInput = {
   deliverTime: string;
   /** Accessory ids the customer ticked. */
   accessoryIds: string[];
+  /** Chosen payment channel label, e.g. "GCash" (from the payment step). */
+  paymentMethod: string;
+  /** Storage path of the uploaded payment screenshot in payment-proofs. */
+  proofPath: string;
 };
 
 export async function createRentBooking(
@@ -56,6 +60,8 @@ export async function createRentBooking(
   if (!input.date) return { error: "Please pick a rental date." };
   if (!input.deliverTime) return { error: "Please choose a delivery time." };
   if (!input.idPath) return { error: "Please upload a valid ID." };
+  if (!input.paymentMethod) return { error: "Please choose a payment option." };
+  if (!input.proofPath) return { error: "Please upload your payment proof." };
 
   // Snapshot the dress from the DB — we store its name on the booking so the
   // record survives even if the dress is later renamed or deleted, and we take
@@ -125,6 +131,8 @@ export async function createRentBooking(
     end_date: end,
     deliver_time: input.deliverTime,
     amount: dress.price + accessoriesTotal,
+    payment_method: input.paymentMethod,
+    proof_url: input.proofPath, // path in the private payment-proofs bucket
   });
   if (insErr) {
     return { error: "Couldn't save your reservation. Please try again." };

@@ -1,10 +1,18 @@
 "use client";
 
-import { useState, useTransition, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { AccessoryPicker, type CustomerAccessory } from "../accessory-picker";
-import { createRentBooking } from "@/app/reserve-actions";
+import type { RentBookingInput } from "@/app/reserve-actions";
 import { DELIVERY_TIMES, niceDate } from "@/lib/reserve";
+
+/** What the rent form hands to the payment step: the booking details it has
+ *  collected (everything except the payment channel + proof, which come next)
+ *  plus the running total, shown as the amount due. */
+export type RentContinueData = {
+  input: Omit<RentBookingInput, "paymentMethod" | "proofPath">;
+  total: number;
+};
 
 /* Small brand-token field label, mirroring the admin editors. */
 function FieldLabel({
@@ -35,25 +43,27 @@ const inputClass =
 /**
  * The rent form — step 2 of the reserve flow, shown beside the calendar (see
  * design/index.html → RentForm). Collects the renter's details, their valid ID,
- * the chosen accessories and a delivery time, then saves a 'pending' booking.
+ * the chosen accessories and a delivery time, then hands off to the payment step
+ * (the booking is only saved once payment proof is submitted there).
  *
  * ID UPLOAD: the ID goes to the PRIVATE `payment-proofs` bucket. As with the
  * admin editors, the file is uploaded straight from the browser and only its
  * storage PATH (not the bytes, and there's no public URL — the bucket is
- * private) is sent to the server action. The date itself is re-checked on the
+ * private) is carried forward to the payment step. The date is re-checked on the
  * server before the row is written.
  */
 export function RentForm({
   dress,
   accessories,
   date,
-  onDone,
+  onContinue,
 }: {
   dress: { id: string; name: string; price: number };
   accessories: CustomerAccessory[];
   /** The rental date picked on the calendar, or null until one is chosen. */
   date: string | null;
-  onDone: () => void;
+  /** Advance to the payment step, carrying the collected booking details. */
+  onContinue: (data: RentContinueData) => void;
 }) {
   const supabase = createClient();
 
@@ -70,7 +80,6 @@ export function RentForm({
   const [uploading, setUploading] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
 
   const toggle = (id: string) =>
     setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
@@ -110,11 +119,12 @@ export function RentForm({
     !!idPath &&
     !uploading;
 
-  function handleSubmit() {
+  // Hand the collected details to the payment step. Nothing is saved yet — the
+  // booking row is written only after payment proof is submitted there.
+  function handleContinue() {
     if (!date || !idPath) return;
-    setError(null);
-    startTransition(async () => {
-      const res = await createRentBooking({
+    onContinue({
+      input: {
         dressId: dress.id,
         name,
         contact,
@@ -123,12 +133,8 @@ export function RentForm({
         date,
         deliverTime,
         accessoryIds: picked,
-      });
-      if (res.error) {
-        setError(res.error);
-        return;
-      }
-      onDone();
+      },
+      total,
     });
   }
 
@@ -252,11 +258,11 @@ export function RentForm({
 
       <button
         type="button"
-        onClick={handleSubmit}
-        disabled={!canSubmit || isPending}
+        onClick={handleContinue}
+        disabled={!canSubmit}
         className="flex min-h-tap w-full items-center justify-center rounded-lg bg-brand-primary px-6 text-label-base uppercase tracking-label text-text-on-primary transition-fast hover:bg-brand-primary-hover disabled:opacity-50"
       >
-        {isPending ? "Reserving…" : "Reserve this dress"}
+        Continue to payment
       </button>
     </div>
   );

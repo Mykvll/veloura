@@ -257,6 +257,30 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_methods: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+          qr_url: string | null
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+          qr_url?: string | null
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+          qr_url?: string | null
+          sort_order?: number
+        }
+        Relationships: []
+      }
       reviews: {
         Row: {
           body: string
