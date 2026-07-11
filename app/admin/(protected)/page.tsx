@@ -1,7 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
 import { DressManager } from "@/components/admin/dress-manager";
 import { AccessoriesManager } from "@/components/admin/accessories-manager";
-import type { AdminDress, AdminAccessory } from "@/components/admin/types";
+import { PaymentMethodsManager } from "@/components/admin/payment-methods-manager";
+import { BookingsManager } from "@/components/admin/bookings-manager";
+import type {
+  AdminDress,
+  AdminAccessory,
+  AdminPaymentMethod,
+  AdminBooking,
+} from "@/components/admin/types";
 
 // Session-based + always-fresh: the list must reflect writes immediately.
 export const dynamic = "force-dynamic";
@@ -53,6 +60,27 @@ export default async function AdminDashboardPage() {
   const { data: accessories, error: accessoriesError } = await supabase
     .from("accessories")
     .select("id, name, price, cost, stock, image_url")
+    .order("created_at", { ascending: false });
+
+  // Payment channels for the third section. Ordered the same way the customer
+  // picker shows them (sort_order, then creation order) so admin + customer
+  // agree on the list.
+  const { data: paymentMethods, error: paymentMethodsError } = await supabase
+    .from("payment_methods")
+    .select("id, name, qr_url")
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  // Rentals for the Bookings & Payments section (fittings have no payment proof
+  // to verify). Newest first so the latest reservation sits at the top. Admin
+  // can read every booking incl. the PII, per the "admin read bookings" policy.
+  const { data: rentalRows } = await supabase
+    .from("bookings")
+    .select(
+      `id, renter_name, dress_name, contact, start_date, end_date,
+       deliver_time, amount, payment_status, proof_url`,
+    )
+    .eq("type", "rent")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -110,6 +138,41 @@ export default async function AdminDashboardPage() {
     imageUrl: a.image_url,
   }));
 
+  // Shape payment-method rows for the Payments section.
+  const paymentMethodRows: AdminPaymentMethod[] = (paymentMethods ?? []).map(
+    (m) => ({ id: m.id, name: m.name, qrUrl: m.qr_url }),
+  );
+
+  // Shape bookings for the Bookings section. The payment proof sits in the
+  // PRIVATE `payment-proofs` bucket — there's no public URL, and RLS blocks the
+  // browser from reading it directly. So here on the server (as the logged-in
+  // admin) we mint a short-lived SIGNED URL for each proof: a link with a
+  // time-limited token baked in that lets the admin's browser load just that one
+  // file for the next hour, without ever making the bucket public.
+  const bookingRows: AdminBooking[] = await Promise.all(
+    (rentalRows ?? []).map(async (b) => {
+      let proofUrl: string | null = null;
+      if (b.proof_url) {
+        const { data: signed } = await supabase.storage
+          .from("payment-proofs")
+          .createSignedUrl(b.proof_url, 60 * 60); // valid 1 hour
+        proofUrl = signed?.signedUrl ?? null;
+      }
+      return {
+        id: b.id,
+        renter: b.renter_name,
+        dress: b.dress_name ?? "Dress",
+        contact: b.contact,
+        start: b.start_date,
+        end: b.end_date,
+        deliver: b.deliver_time,
+        amount: b.amount ?? 0,
+        status: b.payment_status,
+        proofUrl,
+      };
+    }),
+  );
+
   // Stacked sections on one page. The anchor ids (#dresses, #accessories) are
   // what the top nav scrolls to; scroll-mt keeps a section's heading clear of
   // the header when you jump to it.
@@ -132,6 +195,26 @@ export default async function AdminDashboardPage() {
         ) : (
           <AccessoriesManager accessories={accessoryRows} />
         )}
+      </section>
+
+      <section id="payments" className="scroll-mt-24">
+        {paymentMethodsError ? (
+          <div>
+            <h2 className="font-display text-display-lg uppercase tracking-display text-text-accent">
+              Payments
+            </h2>
+            <p className="mt-4 text-body-base text-state-error">
+              Couldn&apos;t load payment types right now:{" "}
+              {paymentMethodsError.message}
+            </p>
+          </div>
+        ) : (
+          <PaymentMethodsManager methods={paymentMethodRows} />
+        )}
+      </section>
+
+      <section id="bookings" className="scroll-mt-24">
+        <BookingsManager bookings={bookingRows} />
       </section>
     </div>
   );

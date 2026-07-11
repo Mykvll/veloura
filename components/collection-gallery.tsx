@@ -4,6 +4,7 @@ import { useState } from "react";
 import { DressCard } from "./dress-card";
 import { DressDetailModal, type DressDetail } from "./dress-detail-modal";
 import type { CustomerAccessory } from "./accessory-picker";
+import type { PaymentOption } from "./reserve/payment-step";
 import type { BlockedDate } from "./availability-calendar";
 
 /**
@@ -23,12 +24,15 @@ import type { BlockedDate } from "./availability-calendar";
 export function CollectionGallery({
   dresses,
   accessories,
+  paymentMethods,
   blockedDates,
   fittingsBooked,
 }: {
   dresses: DressDetail[];
   /** Add-on accessories for the reserve flow — the same list for every dress. */
   accessories: CustomerAccessory[];
+  /** Payment channels (with QR images) for the payment step. */
+  paymentMethods: PaymentOption[];
   /** Every blocked (rental + wash) day across all dresses, for the calendar. */
   blockedDates: BlockedDate[];
   /** Already-taken fitting times keyed by date, for the fitting form. */
@@ -64,6 +68,7 @@ export function CollectionGallery({
           key={openDress.id}
           dress={openDress}
           accessories={accessories}
+          paymentMethods={paymentMethods}
           blockedDates={blockedDates}
           fittingsBooked={fittingsBooked}
           onClose={() => setOpenId(null)}

@@ -11,6 +11,8 @@
 const LINKS = [
   { id: "dresses", label: "Dresses" },
   { id: "accessories", label: "Accessories" },
+  { id: "payments", label: "Payments" },
+  { id: "bookings", label: "Bookings" },
 ] as const;
 
 export function AdminNav() {
