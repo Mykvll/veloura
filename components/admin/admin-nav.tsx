@@ -9,10 +9,12 @@
  * listed (Dresses, Accessories); more are added as they're built.
  */
 const LINKS = [
+  { id: "analytics", label: "Analytics" },
   { id: "dresses", label: "Dresses" },
   { id: "accessories", label: "Accessories" },
   { id: "payments", label: "Payments" },
   { id: "bookings", label: "Bookings" },
+  { id: "calendar", label: "Calendar" },
 ] as const;
 
 export function AdminNav() {
