@@ -73,6 +73,70 @@ export type AdminBooking = {
   proofUrl: string | null;
 };
 
+/**
+ * The numbers the Analytics section shows, all computed on the server from
+ * VERIFIED bookings only (business rule 3). Money is in whole pesos.
+ *
+ * Revenue is broken out: `totalEarned` = what verified renters actually paid
+ * (the booking `amount`), split into `rentalRevenue` (the dress fee) and
+ * `accessoryRevenue` (add-ons, summed from booking_accessories). Spend is what
+ * the shop paid to own the inventory: `dressSpend` (Σ dress cost) +
+ * `accessorySpend` (Σ unit cost × stock on hand). `net` = earned − spend.
+ */
+export type AnalyticsData = {
+  totalEarned: number;
+  rentalRevenue: number;
+  accessoryRevenue: number;
+  totalSpend: number;
+  dressSpend: number;
+  accessorySpend: number;
+  net: number;
+  /** How many verified rentals, and how many rentals still awaiting review. */
+  verifiedCount: number;
+  pending: number;
+  /** Most-rented dress by name (verified only), and its rental count. */
+  topDress: string;
+  topDressCount: number;
+  /** Live dresses in the catalogue. */
+  dressesLive: number;
+  /** Accessory catalogue size + how many are out (0) / low (≤2) on stock. */
+  accessoriesCount: number;
+  outStock: number;
+  lowStock: number;
+  /** Average earned per verified rental, or null when there are none yet. */
+  avgPerRental: number | null;
+};
+
+/**
+ * A rental as the Booking Calendar works with it. Only active rentals
+ * (payment_status pending|verified) reach the calendar — the same set that
+ * blocks dates — so each one occupies its start..end days plus a hand-wash day
+ * on end+1. Dates are ISO "YYYY-MM-DD".
+ */
+export type CalendarRental = {
+  id: string;
+  dress: string;
+  renter: string;
+  start: string;
+  end: string;
+  /** Preferred delivery time, e.g. "10:00 AM" (shown on the pick-up day). */
+  deliver: string | null;
+};
+
+/**
+ * A fitting appointment as the Booking Calendar works with it. Only active
+ * fittings (pending|verified) appear, matching booked_fitting_slots.
+ */
+export type CalendarFitting = {
+  id: string;
+  dress: string;
+  renter: string;
+  /** ISO day of the appointment. */
+  date: string;
+  /** Slot time, e.g. "3:00 PM". */
+  time: string | null;
+};
+
 /** The sizes a dress can be offered in, in display order. */
 export const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL"] as const;
 

@@ -1,13 +1,18 @@
 import { createClient } from "@/lib/supabase/server";
+import { AnalyticsSummary } from "@/components/admin/analytics-summary";
 import { DressManager } from "@/components/admin/dress-manager";
 import { AccessoriesManager } from "@/components/admin/accessories-manager";
 import { PaymentMethodsManager } from "@/components/admin/payment-methods-manager";
 import { BookingsManager } from "@/components/admin/bookings-manager";
+import { BookingCalendar } from "@/components/admin/booking-calendar";
 import type {
   AdminDress,
   AdminAccessory,
   AdminPaymentMethod,
   AdminBooking,
+  AnalyticsData,
+  CalendarRental,
+  CalendarFitting,
 } from "@/components/admin/types";
 
 // Session-based + always-fresh: the list must reflect writes immediately.
@@ -42,17 +47,44 @@ export default async function AdminDashboardPage() {
     )
     .order("created_at", { ascending: false });
 
-  // Verified rentals per dress. Business rule: analytics count 'verified' only.
+  // Verified bookings drive both the per-dress "Rented N×" badge and the
+  // Analytics section. Business rule 3: analytics count 'verified' only. (A
+  // fitting never reaches 'verified' — it has no payment proof to verify — so
+  // every verified row here is a real rental sale.) We pull the amount and the
+  // snapshotted dress name so we can total revenue and find the most-rented.
   const { data: verified } = await supabase
     .from("bookings")
-    .select("dress_id")
+    .select("id, dress_id, dress_name, amount")
     .eq("payment_status", "verified");
 
   const rentedByDress = new Map<string, number>();
+  const rentalCountByName = new Map<string, number>();
   for (const b of verified ?? []) {
     if (b.dress_id) {
       rentedByDress.set(b.dress_id, (rentedByDress.get(b.dress_id) ?? 0) + 1);
     }
+    if (b.dress_name) {
+      rentalCountByName.set(
+        b.dress_name,
+        (rentalCountByName.get(b.dress_name) ?? 0) + 1,
+      );
+    }
+  }
+
+  // Accessory add-on revenue for those verified bookings. Each add-on's price is
+  // snapshotted on booking_accessories.price_at_booking, so this is immune to
+  // later accessory price edits. The rental fee is then earned − add-ons.
+  const verifiedIds = (verified ?? []).map((b) => b.id);
+  let accessoryRevenue = 0;
+  if (verifiedIds.length > 0) {
+    const { data: addonRows } = await supabase
+      .from("booking_accessories")
+      .select("price_at_booking")
+      .in("booking_id", verifiedIds);
+    accessoryRevenue = (addonRows ?? []).reduce(
+      (sum, r) => sum + (r.price_at_booking ?? 0),
+      0,
+    );
   }
 
   // Accessories for the second section (newest first, same as the old
@@ -70,6 +102,16 @@ export default async function AdminDashboardPage() {
     .select("id, name, qr_url")
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
+
+  // Active fittings for the Calendar section — pending|verified only, matching
+  // booked_fitting_slots so the calendar agrees with what actually blocks a
+  // slot. (Rentals for the calendar are derived from the Bookings rows below.)
+  const { data: fittingRows } = await supabase
+    .from("bookings")
+    .select("id, dress_name, renter_name, fitting_date, fitting_time")
+    .eq("type", "fitting")
+    .in("payment_status", ["pending", "verified"])
+    .not("fitting_date", "is", null);
 
   // Rentals for the Bookings & Payments section (fittings have no payment proof
   // to verify). Newest first so the latest reservation sits at the top. Admin
@@ -173,11 +215,80 @@ export default async function AdminDashboardPage() {
     }),
   );
 
-  // Stacked sections on one page. The anchor ids (#dresses, #accessories) are
+  // ---- Analytics (VERIFIED only) --------------------------------------------
+  // Computed here so it recomputes on every load; the page is force-dynamic and
+  // every admin mutation calls router.refresh(), so the cards always reflect the
+  // current bookings. Money is in whole pesos.
+  const totalEarned = (verified ?? []).reduce((s, b) => s + (b.amount ?? 0), 0);
+  const rentalRevenue = totalEarned - accessoryRevenue;
+
+  // Inventory spend: what the shop paid to own the catalogue on hand.
+  const dressSpend = rows.reduce((s, d) => s + d.cost, 0);
+  const accessorySpend = accessoryRows.reduce((s, a) => s + a.cost * a.stock, 0);
+  const totalSpend = dressSpend + accessorySpend;
+
+  // Most-rented dress (verified only), by snapshotted name.
+  let topDress = "";
+  let topDressCount = 0;
+  for (const [name, count] of rentalCountByName) {
+    if (count > topDressCount) {
+      topDress = name;
+      topDressCount = count;
+    }
+  }
+
+  // ---- Calendar data --------------------------------------------------------
+  // Active rentals (pending|verified with dates) drive the calendar's rented /
+  // wash days; the component itself expands each into its start..end + wash day.
+  const calendarRentals: CalendarRental[] = bookingRows
+    .filter((b) => (b.status === "pending" || b.status === "verified") && b.start && b.end)
+    .map((b) => ({
+      id: b.id,
+      dress: b.dress,
+      renter: b.renter,
+      start: b.start as string,
+      end: b.end as string,
+      deliver: b.deliver,
+    }));
+
+  const calendarFittings: CalendarFitting[] = (fittingRows ?? []).map((f) => ({
+    id: f.id,
+    dress: f.dress_name ?? "Dress",
+    renter: f.renter_name,
+    date: f.fitting_date as string,
+    time: f.fitting_time,
+  }));
+
+  const verifiedCount = verified?.length ?? 0;
+  const analytics: AnalyticsData = {
+    totalEarned,
+    rentalRevenue,
+    accessoryRevenue,
+    totalSpend,
+    dressSpend,
+    accessorySpend,
+    net: totalEarned - totalSpend,
+    verifiedCount,
+    // Rentals still awaiting review (from the rows we already fetched).
+    pending: bookingRows.filter((b) => b.status === "pending").length,
+    topDress,
+    topDressCount,
+    dressesLive: rows.filter((d) => d.status === "live").length,
+    accessoriesCount: accessoryRows.length,
+    outStock: accessoryRows.filter((a) => a.stock <= 0).length,
+    lowStock: accessoryRows.filter((a) => a.stock > 0 && a.stock <= 2).length,
+    avgPerRental: verifiedCount ? Math.round(totalEarned / verifiedCount) : null,
+  };
+
+  // Stacked sections on one page. The anchor ids (#analytics, #dresses, …) are
   // what the top nav scrolls to; scroll-mt keeps a section's heading clear of
   // the header when you jump to it.
   return (
     <div className="flex flex-col gap-20">
+      <section id="analytics" className="scroll-mt-24">
+        <AnalyticsSummary data={analytics} />
+      </section>
+
       <section id="dresses" className="scroll-mt-24">
         <DressManager dresses={rows} />
       </section>
@@ -215,6 +326,13 @@ export default async function AdminDashboardPage() {
 
       <section id="bookings" className="scroll-mt-24">
         <BookingsManager bookings={bookingRows} />
+      </section>
+
+      <section id="calendar" className="scroll-mt-24">
+        <BookingCalendar
+          rentals={calendarRentals}
+          fittings={calendarFittings}
+        />
       </section>
     </div>
   );
