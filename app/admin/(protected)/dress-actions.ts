@@ -110,9 +110,10 @@ export async function saveDress(input: DressInput): Promise<ActionResult> {
   }
 
   // Refresh the pages that show this data so the change appears immediately.
+  // (The dress detail now lives in a modal on "/", so there's no /dress/[id]
+  // route to revalidate any more.)
   revalidatePath("/");
   revalidatePath("/admin");
-  revalidatePath(`/dress/${input.id}`);
 
   return { error: null };
 }
