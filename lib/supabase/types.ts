@@ -310,6 +310,21 @@ export type Database = {
           },
         ]
       }
+      booked_fitting_slots: {
+        Row: {
+          fitting_date: string | null
+          fitting_time: string | null
+        }
+        Insert: {
+          fitting_date?: string | null
+          fitting_time?: string | null
+        }
+        Update: {
+          fitting_date?: string | null
+          fitting_time?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never
