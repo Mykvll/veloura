@@ -51,17 +51,89 @@ fails. Use `smoke.mjs` as the template for a deeper drive (it's plain
 Playwright) — `page.locator("main button", { hasText: "FLORENCIA" }).click()`,
 `getByRole("button", { name: /Pearl drop earrings/ })`, etc.
 
+## Documentation drive (full reserve flow + checklist)
+
+When the ask is to **prove a customer-facing flow works and hand off screenshots**
+(not just a quick smoke), use `doc-drive.mjs`. It walks the entire reserve flow
+and produces the "final output": one **numbered screenshot per state** plus a
+`results` JSON of assertions that proves each behaviour actually happened.
+
+```bash
+# 1) seed blocked days (see the header of doc-drive.mjs for the exact INSERT).
+#    Dates MUST be future days in one month — past days render disabled.
+# 2) run the drive:
+node .claude/skills/run-veloura/doc-drive.mjs
+# → writes ./reserve-flow-screenshots/01..11-*.png  (override with SHOT_DIR=…)
+# 3) clean up (below), then Read the PNGs back so they render for the user.
+```
+
+It captures: `01-collection`, `02-detail-modal`, `03-rent-calendar` (this dress's
+days disabled, another dress's booked days clickable-with-dot), `04-rent-date-selected`,
+`05-next-month-jump-to-today`, `06-fitting-calendar` (any booked day disabled),
+`07-rent-form-filled`, `08-rent-confirmation`, `09-overlap-rejected` (server
+re-check), `10-fitting-form-filled`, `11-fitting-confirmation`. Each screenshot
+number in `doc-drive.mjs` is a checklist item — add a step + `shot("NN-…png")`
+to extend it.
+
+**Deliverable to the user:** the numbered PNGs (they persist in
+`reserve-flow-screenshots/`, which is untracked — not committed), a checklist
+table mapping each item to its screenshot + assertion, and confirmation that
+`errors` was empty and test data was cleaned up. `Read` each PNG so it renders
+inline in the reply.
+
+### Clean up after a write drive
+
+`doc-drive.mjs` **writes** bookings and uploads test IDs. Always undo it so the
+DB/storage stay clean (over the Supabase MCP / SQL, then the storage helper):
+
+```sql
+-- 1) delete the seed + form-created bookings and any orphaned accessory links
+delete from bookings where renter_name in
+  ('DEMO Florencia','DEMO Carmela','Maria Santos','Fitting Tester','Overlap Tester');
+delete from booking_accessories ba
+  where not exists (select 1 from bookings b where b.id = ba.booking_id);
+```
+
+```sql
+-- 2) grant the anon role TEMP read+delete on the private bucket so the helper
+--    can remove the uploaded test IDs (SQL can't delete storage objects directly)
+create policy "temp cleanup select" on storage.objects for select to anon using (bucket_id='payment-proofs');
+create policy "temp cleanup delete" on storage.objects for delete to anon using (bucket_id='payment-proofs');
+```
+
+```bash
+node .claude/skills/run-veloura/storage-cleanup.mjs   # removes ids/*.png
+```
+
+```sql
+-- 3) DROP the temp policies (leave only "public upload payment-proofs")
+drop policy "temp cleanup select" on storage.objects;
+drop policy "temp cleanup delete" on storage.objects;
+```
+
+Verify a clean slate: `select count(*) from bookings;` → 0 (if the DB had none
+before), and `pg_policies` on `storage.objects` shows only the real policies.
+
 ## App-specific gotchas
 
-- **The reserve panel is gated behind sizes.** The dress-detail modal only
-  renders `<DressDetailsPanel>` (sizes, fees, the accessories picker, the running
-  total) when the dress has at least one `dress_sizes` row — otherwise it shows
-  "Sizing details coming soon." To exercise the accessories picker, drive a dress
-  that has a size (e.g. seed one), not just any card. `smoke.mjs` reports
-  `hasAccessoriesPicker` so a data-less run is obvious.
-- **Accessories need rows.** The picker reads the `accessories` table; an empty
-  table shows no picker section. Out-of-stock (`stock <= 0`) rows render disabled,
-  not hidden.
+- **The reserve buttons are gated behind sizes.** The dress-detail modal only
+  renders `<DressDetailsPanel>` (sizes, fees, the **Reserve this dress** +
+  **Book a fitting** buttons) when the dress has at least one `dress_sizes` row —
+  otherwise it shows "Sizing details coming soon." Drive a dress that has a size
+  (e.g. seed one), not just any card. `smoke.mjs` reports `hasReserveButtons`.
+- **The reserve flow is a wizard inside the modal.** Clicking a reserve button
+  swaps the modal body to the **date step**: the availability calendar (left) +
+  the rent/fitting form (right), then a confirmation step. So the accessories
+  picker and the ID upload live in the **rent form**, NOT on the detail page.
+  `getByRole("button",{name:"Reserve this dress"})` → date step (rent);
+  `"Book a fitting"` → date step (fitting); `"← Back to details"` goes back.
+- **Accessories need rows.** The rent form's picker reads the `accessories`
+  table; an empty table shows no picker. Out-of-stock (`stock <= 0`) rows render
+  disabled, not hidden.
+- **Writes run as `anon` and can't read back.** Bookings are INSERT-only for the
+  public role (SELECT is admin-only), so the reserve flow never uses
+  `.insert().select()`. A drive that submits a booking creates real rows — always
+  clean up (see the documentation-drive section).
 - **Duplicate `key` warning** appears if a dress has two `dress_sizes` rows with
   the same `size` value (the size pills key on `s.size`). That's seed-data noise,
   not a code bug.

@@ -37,16 +37,17 @@ try {
   await page.waitForTimeout(400); // let the dialog settle
   await page.screenshot({ path: path.join(shotDir, "02-detail-modal.png") });
 
-  // The accessories picker + running total only render for a dress that has
-  // sizes (the reserve panel is gated behind dress_sizes). Report whether it
-  // showed so a data-less run is obvious rather than a silent pass.
-  const hasPicker = await page
-    .locator("text=limited stock — add to your rental")
+  // The Reserve / Book-a-fitting buttons only render for a dress that has sizes
+  // (gated behind dress_sizes). Report whether they showed so a data-less run is
+  // obvious rather than a silent pass. (The accessories picker + ID upload now
+  // live one step deeper, in the rent form — see doc-drive.mjs to exercise it.)
+  const hasReserveButtons = await page
+    .getByRole("button", { name: "Reserve this dress" })
     .isVisible()
     .catch(() => false);
 
   console.log(
-    JSON.stringify({ baseUrl, shotDir, hasAccessoriesPicker: hasPicker, errors }, null, 2),
+    JSON.stringify({ baseUrl, shotDir, hasReserveButtons, errors }, null, 2),
   );
 } catch (e) {
   console.error("SMOKE FAILED:", e.message);
