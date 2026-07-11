@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { AccessoryPicker, type CustomerAccessory } from "./accessory-picker";
 
 /** One available size with its measurements (from the dress_sizes table). */
 export type DressSize = {
@@ -40,33 +39,24 @@ function SpecRow({ label, cm }: { label: string; cm: number | null }) {
  *
  * Choosing a size swaps the measurements shown, so this holds client state.
  * Fees below (deposit, per-extra-day) are fixed business rules from the design.
- *
- * ACCESSORIES: the same accessories list is passed for every dress. This panel
- * owns which ones are picked and shows a running total (dress price + picked
- * add-ons). Nothing is saved yet — this is the picker UI and the total only.
+ * Accessories are NOT chosen here — like the prototype, they live in the rent
+ * form (step 2), so this column is just sizes, fees, and the two actions.
  */
 export function DressDetailsPanel({
   sizes,
   price,
-  accessories,
+  onReserve,
+  onFitting,
 }: {
   sizes: DressSize[];
   price: number;
-  accessories: CustomerAccessory[];
+  /** Open the date calendar to rent this dress. */
+  onReserve: () => void;
+  /** Open the date calendar to book a fitting. */
+  onFitting: () => void;
 }) {
   const [activeSize, setActiveSize] = useState(0);
   const selected = sizes[activeSize];
-
-  // Which accessories are added on. Toggling flips one id in/out of the list.
-  const [picked, setPicked] = useState<string[]>([]);
-  const toggle = (id: string) =>
-    setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
-
-  // Running total = dress rental fee + every picked accessory's add-on price.
-  const accessoriesTotal = accessories
-    .filter((a) => picked.includes(a.id))
-    .reduce((sum, a) => sum + a.price, 0);
-  const total = price + accessoriesTotal;
 
   return (
     <div className="flex flex-col gap-6">
@@ -143,45 +133,21 @@ export function DressDetailsPanel({
         tailoring, cutting, or alterations.
       </p>
 
-      {/* Accessories add-on picker + running total. Only shown when there are
-          accessories to offer. */}
-      {accessories.length > 0 ? (
-        <>
-          <div>
-            <div className="mb-2 flex flex-wrap items-baseline gap-2">
-              <span className="text-label-base uppercase tracking-label text-text-heading">
-                Accessories
-              </span>
-              <span className="text-body-sm text-text-secondary">
-                limited stock — add to your rental
-              </span>
-            </div>
-            <AccessoryPicker
-              accessories={accessories}
-              picked={picked}
-              onToggle={toggle}
-            />
-          </div>
-
-          {/* Running total — dress fee plus any picked add-ons. */}
-          <div className="flex items-baseline justify-between border-t border-border-soft pt-3">
-            <span className="text-label-base uppercase tracking-label text-text-heading">
-              Total{accessoriesTotal ? " (dress + accessories)" : ""}
-            </span>
-            <span className="text-price-lg text-text-accent">
-              ₱{total.toLocaleString("en-PH")}
-            </span>
-          </div>
-        </>
-      ) : null}
-
-      {/* Reserve action. The reservation wizard is a later phase, so for now this
-          is a styled button that doesn't open anything yet. */}
+      {/* Reserve / fitting actions — both open the availability calendar (in
+          rent or fitting mode). Matches the prototype's DetailsRight. */}
       <button
         type="button"
+        onClick={onReserve}
         className="flex min-h-tap w-full items-center justify-center rounded-lg bg-brand-primary px-6 text-label-base uppercase tracking-label text-text-on-primary transition-fast hover:bg-brand-primary-hover"
       >
         Reserve this dress
+      </button>
+      <button
+        type="button"
+        onClick={onFitting}
+        className="flex min-h-tap w-full items-center justify-center rounded-lg border border-border-strong bg-background-card px-6 text-label-base uppercase tracking-label text-text-primary transition-fast hover:border-border-accent"
+      >
+        Book a fitting
       </button>
     </div>
   );

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { DressCard } from "./dress-card";
 import { DressDetailModal, type DressDetail } from "./dress-detail-modal";
 import type { CustomerAccessory } from "./accessory-picker";
+import type { BlockedDate } from "./availability-calendar";
 
 /**
  * The collection grid + dress-detail modal, on one page ("/").
@@ -22,10 +23,16 @@ import type { CustomerAccessory } from "./accessory-picker";
 export function CollectionGallery({
   dresses,
   accessories,
+  blockedDates,
+  fittingsBooked,
 }: {
   dresses: DressDetail[];
   /** Add-on accessories for the reserve flow — the same list for every dress. */
   accessories: CustomerAccessory[];
+  /** Every blocked (rental + wash) day across all dresses, for the calendar. */
+  blockedDates: BlockedDate[];
+  /** Already-taken fitting times keyed by date, for the fitting form. */
+  fittingsBooked: Record<string, string[]>;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const openDress = dresses.find((d) => d.id === openId) ?? null;
@@ -54,8 +61,11 @@ export function CollectionGallery({
       {/* Detail modal — rendered only while a dress is open. */}
       {openDress ? (
         <DressDetailModal
+          key={openDress.id}
           dress={openDress}
           accessories={accessories}
+          blockedDates={blockedDates}
+          fittingsBooked={fittingsBooked}
           onClose={() => setOpenId(null)}
         />
       ) : null}

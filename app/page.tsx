@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { CollectionGallery } from "@/components/collection-gallery";
 import type { DressDetail } from "@/components/dress-detail-modal";
 import type { CustomerAccessory } from "@/components/accessory-picker";
+import type { BlockedDate } from "@/components/availability-calendar";
 
 // Always fetch fresh from Supabase on each request (no static caching), so new
 // dresses show up as soon as they're added.
@@ -41,6 +42,38 @@ export default async function Home() {
     stock: a.stock,
     imageUrl: a.image_url,
   }));
+
+  // Blocked days for the reserve-flow calendar. The `blocked_dates` view already
+  // expands each active rental into its rental days PLUS the wash day
+  // (end_date + 1), one row per (dress, day) — so we just pass the flat list to
+  // the calendar and let it decide what to disable per mode. See
+  // <AvailabilityCalendar>.
+  const { data: blockedRows } = await supabase
+    .from("blocked_dates")
+    .select("dress_id, dress_name, blocked_day");
+
+  const blockedDates: BlockedDate[] = (blockedRows ?? [])
+    // The view's columns are nullable in the generated types; keep only complete
+    // rows so the calendar's keys are always real days.
+    .filter((r) => r.dress_id && r.blocked_day)
+    .map((r) => ({
+      dressId: r.dress_id as string,
+      dressName: r.dress_name ?? "",
+      day: r.blocked_day as string,
+    }));
+
+  // Already-taken fitting slots, so the fitting form can disable them. Read from
+  // the `booked_fitting_slots` view (which surfaces just date + time, without
+  // the PII on bookings). Shaped into a { "YYYY-MM-DD": ["4:00 PM", …] } map.
+  const { data: fittingRows } = await supabase
+    .from("booked_fitting_slots")
+    .select("fitting_date, fitting_time");
+
+  const fittingsBooked: Record<string, string[]> = {};
+  for (const r of fittingRows ?? []) {
+    if (!r.fitting_date || !r.fitting_time) continue;
+    (fittingsBooked[r.fitting_date] ??= []).push(r.fitting_time);
+  }
 
   if (error) {
     // Surface the failure instead of rendering a silently-empty grid.
@@ -94,7 +127,12 @@ export default async function Home() {
         // Empty state — no dresses yet.
         <p className="mt-8 text-body-base text-text-secondary">No dresses yet</p>
       ) : (
-        <CollectionGallery dresses={cards} accessories={accessories} />
+        <CollectionGallery
+          dresses={cards}
+          accessories={accessories}
+          blockedDates={blockedDates}
+          fittingsBooked={fittingsBooked}
+        />
       )}
     </main>
   );
