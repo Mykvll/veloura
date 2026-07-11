@@ -22,6 +22,24 @@ export type AdminDress = {
   rentedCount: number;
 };
 
+/**
+ * The plain, serializable shape of an accessory as the admin UI works with it.
+ * Maps 1:1 to the `accessories` table (price = rental add-on price, cost = your
+ * unit cost, stock = how many you own).
+ */
+export type AdminAccessory = {
+  id: string;
+  name: string;
+  /** Rental add-on price shown to customers, in pesos. */
+  price: number;
+  /** Your unit cost — feeds Analytics. */
+  cost: number;
+  /** How many you own. Hidden/disabled for customers at 0. */
+  stock: number;
+  /** Public URL of the image in the dress-photos bucket, or null. */
+  imageUrl: string | null;
+};
+
 /** The sizes a dress can be offered in, in display order. */
 export const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL"] as const;
 

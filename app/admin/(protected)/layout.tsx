@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { AdminNav } from "@/components/admin/admin-nav";
 import { signOut } from "../actions";
 
 // The session comes from cookies, so anything under here is per-request, never
@@ -40,9 +41,12 @@ export default async function AdminLayout({
       {/* Admin header */}
       <header className="border-b border-border-soft bg-background-card">
         <div className="mx-auto flex w-full max-w-page-max items-center justify-between px-6 py-4">
-          <span className="font-display text-display-md uppercase tracking-display text-text-accent">
-            Veloura Admin
-          </span>
+          <div className="flex items-center gap-6">
+            <span className="font-display text-display-md uppercase tracking-display text-text-accent">
+              Veloura Admin
+            </span>
+            <AdminNav />
+          </div>
 
           <div className="flex items-center gap-4">
             <span className="hidden text-body-sm text-text-secondary sm:inline">

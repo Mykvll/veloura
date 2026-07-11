@@ -1,5 +1,4 @@
 import Image from "next/image";
-import Link from "next/link";
 
 /**
  * The exact shape a DressCard needs. We keep this narrow (not the whole DB row)
@@ -36,15 +35,25 @@ const STRIPED_PLACEHOLDER =
  *  - price like "₱500 (2 days)" in brown (text.heading), qualifier muted —
  *    matching the prototype card (the gold title-color rule covers serif TITLES,
  *    not the price line here)
+ *
+ * Tapping the card opens the dress-detail modal (the first step of the
+ * reservation wizard) via `onClick` — it no longer navigates to a separate
+ * page. That's why this is a <button>, not a link.
  */
-export function DressCard({ dress }: { dress: DressCardData }) {
+export function DressCard({
+  dress,
+  onClick,
+}: {
+  dress: DressCardData;
+  onClick: () => void;
+}) {
   return (
-    // The whole card links through to the dress-detail page (/dress/[id]).
     // `@container` makes this card a container-query context so the name below
     // can size itself against the card's own width.
-    <Link
-      href={`/dress/${dress.id}`}
-      className="@container block overflow-hidden rounded-lg border border-border-soft bg-background-card shadow-card transition duration-medium ease-soft hover:-translate-y-[3px] hover:shadow-float focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-brand-primary/35"
+    <button
+      type="button"
+      onClick={onClick}
+      className="@container block w-full overflow-hidden rounded-lg border border-border-soft bg-background-card text-left shadow-card transition duration-medium ease-soft hover:-translate-y-[3px] hover:shadow-float focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-brand-primary/35"
     >
       {/* Cover photo. Fixed 3:4 portrait frame keeps the grid tidy even when
           source photos vary in size. */}
@@ -86,6 +95,6 @@ export function DressCard({ dress }: { dress: DressCardData }) {
           <span className="text-body-sm text-text-secondary">(2 days)</span>
         </p>
       </div>
-    </Link>
+    </button>
   );
 }

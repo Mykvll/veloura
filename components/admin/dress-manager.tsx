@@ -10,8 +10,8 @@ import type { AdminDress } from "./types";
  * It renders one tile per dress plus an "Add a dress" tile, and owns the editor
  * modal's open/close state. Clicking a dress opens the editor for it; clicking
  * the Add tile opens the editor in "new" mode. The tiles themselves are plain
- * (they intentionally do NOT reuse the customer <DressCard>, which is a link to
- * the public detail page — here a click must open the editor instead).
+ * (they intentionally do NOT reuse the customer <DressCard>, which opens the
+ * public detail modal — here a click must open the editor instead).
  *
  * `editing` is: an AdminDress (edit that one) | "new" (create) | null (closed).
  */

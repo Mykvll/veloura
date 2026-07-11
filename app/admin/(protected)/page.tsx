@@ -1,18 +1,24 @@
 import { createClient } from "@/lib/supabase/server";
 import { DressManager } from "@/components/admin/dress-manager";
-import type { AdminDress } from "@/components/admin/types";
+import { AccessoriesManager } from "@/components/admin/accessories-manager";
+import type { AdminDress, AdminAccessory } from "@/components/admin/types";
 
 // Session-based + always-fresh: the list must reflect writes immediately.
 export const dynamic = "force-dynamic";
 
 /**
- * Admin dashboard (/admin) — the "Manage Collection" screen.
+ * Admin dashboard (/admin) — the whole admin experience on ONE page.
  *
- * This is a server component: it fetches every dress with all of its child
- * data (photos, sizes, reviews) and the verified-rental counts, shapes those
- * raw Supabase rows into the plain `AdminDress` objects the UI works with, then
- * hands them to <DressManager> (a client component that renders the grid and
- * owns the editor modal).
+ * Like the admin.html prototype, every feature is a stacked SECTION on this
+ * single route rather than its own page. So far two sections are built —
+ * "Dresses" (#dresses) and "Accessories" (#accessories) — and the top nav
+ * scrolls between them. (Analytics / Bookings / Calendar are later phases.)
+ *
+ * This is a server component: it fetches everything both sections need — every
+ * dress with its child data + verified-rental counts, and every accessory —
+ * shapes the raw Supabase rows into the plain objects the client components
+ * work with, and hands them to <DressManager> and <AccessoriesManager>, which
+ * own their own grids and editor modals.
  */
 export default async function AdminDashboardPage() {
   const supabase = await createClient();
@@ -41,6 +47,13 @@ export default async function AdminDashboardPage() {
       rentedByDress.set(b.dress_id, (rentedByDress.get(b.dress_id) ?? 0) + 1);
     }
   }
+
+  // Accessories for the second section (newest first, same as the old
+  // /admin/accessories page which is now folded in here).
+  const { data: accessories, error: accessoriesError } = await supabase
+    .from("accessories")
+    .select("id, name, price, cost, stock, image_url")
+    .order("created_at", { ascending: false });
 
   if (error) {
     return (
@@ -87,5 +100,39 @@ export default async function AdminDashboardPage() {
     };
   });
 
-  return <DressManager dresses={rows} />;
+  // Shape accessory rows the same way the old accessories page did.
+  const accessoryRows: AdminAccessory[] = (accessories ?? []).map((a) => ({
+    id: a.id,
+    name: a.name,
+    price: a.price,
+    cost: a.cost ?? 0,
+    stock: a.stock,
+    imageUrl: a.image_url,
+  }));
+
+  // Stacked sections on one page. The anchor ids (#dresses, #accessories) are
+  // what the top nav scrolls to; scroll-mt keeps a section's heading clear of
+  // the header when you jump to it.
+  return (
+    <div className="flex flex-col gap-20">
+      <section id="dresses" className="scroll-mt-24">
+        <DressManager dresses={rows} />
+      </section>
+
+      <section id="accessories" className="scroll-mt-24">
+        {accessoriesError ? (
+          <div>
+            <h2 className="font-display text-display-lg uppercase tracking-display text-text-accent">
+              Accessories
+            </h2>
+            <p className="mt-4 text-body-base text-state-error">
+              Couldn&apos;t load accessories right now: {accessoriesError.message}
+            </p>
+          </div>
+        ) : (
+          <AccessoriesManager accessories={accessoryRows} />
+        )}
+      </section>
+    </div>
+  );
 }

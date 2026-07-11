@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AccessoryPicker, type CustomerAccessory } from "./accessory-picker";
 
 /** One available size with its measurements (from the dress_sizes table). */
 export type DressSize = {
@@ -39,16 +40,33 @@ function SpecRow({ label, cm }: { label: string; cm: number | null }) {
  *
  * Choosing a size swaps the measurements shown, so this holds client state.
  * Fees below (deposit, per-extra-day) are fixed business rules from the design.
+ *
+ * ACCESSORIES: the same accessories list is passed for every dress. This panel
+ * owns which ones are picked and shows a running total (dress price + picked
+ * add-ons). Nothing is saved yet — this is the picker UI and the total only.
  */
 export function DressDetailsPanel({
   sizes,
   price,
+  accessories,
 }: {
   sizes: DressSize[];
   price: number;
+  accessories: CustomerAccessory[];
 }) {
   const [activeSize, setActiveSize] = useState(0);
   const selected = sizes[activeSize];
+
+  // Which accessories are added on. Toggling flips one id in/out of the list.
+  const [picked, setPicked] = useState<string[]>([]);
+  const toggle = (id: string) =>
+    setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+
+  // Running total = dress rental fee + every picked accessory's add-on price.
+  const accessoriesTotal = accessories
+    .filter((a) => picked.includes(a.id))
+    .reduce((sum, a) => sum + a.price, 0);
+  const total = price + accessoriesTotal;
 
   return (
     <div className="flex flex-col gap-6">
@@ -124,6 +142,38 @@ export function DressDetailsPanel({
         secure the rental date. Fitting by appointment (₱200 per session). No
         tailoring, cutting, or alterations.
       </p>
+
+      {/* Accessories add-on picker + running total. Only shown when there are
+          accessories to offer. */}
+      {accessories.length > 0 ? (
+        <>
+          <div>
+            <div className="mb-2 flex flex-wrap items-baseline gap-2">
+              <span className="text-label-base uppercase tracking-label text-text-heading">
+                Accessories
+              </span>
+              <span className="text-body-sm text-text-secondary">
+                limited stock — add to your rental
+              </span>
+            </div>
+            <AccessoryPicker
+              accessories={accessories}
+              picked={picked}
+              onToggle={toggle}
+            />
+          </div>
+
+          {/* Running total — dress fee plus any picked add-ons. */}
+          <div className="flex items-baseline justify-between border-t border-border-soft pt-3">
+            <span className="text-label-base uppercase tracking-label text-text-heading">
+              Total{accessoriesTotal ? " (dress + accessories)" : ""}
+            </span>
+            <span className="text-price-lg text-text-accent">
+              ₱{total.toLocaleString("en-PH")}
+            </span>
+          </div>
+        </>
+      ) : null}
 
       {/* Reserve action. The reservation wizard is a later phase, so for now this
           is a styled button that doesn't open anything yet. */}
