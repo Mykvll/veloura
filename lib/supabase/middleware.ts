@@ -52,7 +52,21 @@ export async function updateSession(request: NextRequest) {
 
   // IMPORTANT: this call is what actually refreshes the session. Don't remove
   // it, and don't run any auth logic between creating the client and here.
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Block anonymous visitors from every /admin page except the login screen.
+  // The admin layout also checks auth, but a layout check alone isn't enough:
+  // Next.js renders a page IN PARALLEL with its layout, so the page's payload
+  // is built (and sent) even while the layout is redirecting. Middleware runs
+  // before any rendering starts, so the redirect here happens first.
+  const path = request.nextUrl.pathname;
+  if (!user && path.startsWith("/admin") && path !== "/admin/login") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/admin/login";
+    return NextResponse.redirect(url);
+  }
 
   return supabaseResponse;
 }
