@@ -31,7 +31,7 @@ function Hero() {
         className="h-[110px] w-[110px] rounded-full shadow-card"
         priority
       />
-      <h1 className="font-display text-display-lg uppercase tracking-display text-text-accent">
+      <h1 className="font-display text-display-xl uppercase tracking-display text-text-accent">
         Wear luxury,
         <br />
         not the price.

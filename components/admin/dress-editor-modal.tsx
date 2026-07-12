@@ -229,7 +229,7 @@ export function DressEditorModal({
           {/* Header */}
           <div className="flex items-start justify-between gap-4 border-b border-border-soft px-6 py-4">
             <div>
-              <Dialog.Title className="font-display text-display-md uppercase tracking-display text-text-accent">
+              <Dialog.Title className="font-display text-display-lg uppercase tracking-display text-text-accent md:text-display-xl">
                 {isNew ? "New dress" : name || "Edit dress"}
               </Dialog.Title>
               <p className="text-body-sm text-text-secondary">

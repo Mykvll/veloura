@@ -22,7 +22,7 @@ export function SectionTitle({
     <div className="text-center">
       <div className="flex items-center justify-center gap-4">
         <span className="h-px max-w-[90px] flex-1 bg-brand-primary" aria-hidden />
-        <h2 className="flex items-center gap-3 font-display text-display-md uppercase tracking-display text-text-accent">
+        <h2 className="flex items-center gap-3 font-display text-display-lg uppercase tracking-display text-text-accent">
           <span className="text-sm" aria-hidden>
             ✦
           </span>

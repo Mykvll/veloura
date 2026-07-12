@@ -134,7 +134,7 @@ export function DressDetailModal({
           {/* Header — centered dress name (gold display serif) + uppercase
               style/step line, round ✕ in the corner, like the prototype Modal. */}
           <div className="relative border-b border-border-soft px-14 py-4 text-center">
-            <Dialog.Title className="font-display text-display-md uppercase tracking-display text-text-accent md:text-display-lg">
+            <Dialog.Title className="font-display text-display-lg uppercase tracking-display text-text-accent md:text-display-xl">
               {dress.name}
             </Dialog.Title>
             {subtitle ? (
@@ -162,7 +162,7 @@ export function DressDetailModal({
                 <span className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-primary text-3xl leading-none text-text-on-primary">
                   ✓
                 </span>
-                <div className="font-display text-display-md uppercase tracking-display text-text-accent">
+                <div className="font-display text-display-lg uppercase tracking-display text-text-accent">
                   {mode === "fitting" ? "Fitting booked" : "You're all set"}
                 </div>
                 <p className="text-body-base text-text-primary">
