@@ -90,6 +90,9 @@ export function PaymentMethodEditorModal({
   /* --------------------------- save ----------------------------- */
 
   const canSave = name.trim().length > 0 && !uploading;
+  // Lock the upload tile while a file is uploading or the save is in flight —
+  // a QR added mid-save wouldn't make it into the row being written.
+  const uploadLocked = uploading || isPending;
 
   function handleSave() {
     setError(null);
@@ -170,7 +173,13 @@ export function PaymentMethodEditorModal({
                   </button>
                 </div>
               ) : (
-                <label className="flex h-44 w-44 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-sm border border-dashed border-border-strong bg-white px-2 text-center text-body-sm text-text-secondary hover:border-brand-primary">
+                <label
+                  className={`flex h-44 w-44 flex-col items-center justify-center gap-1.5 rounded-sm border border-dashed border-border-strong bg-white px-2 text-center text-body-sm text-text-secondary ${
+                    uploadLocked
+                      ? "cursor-not-allowed opacity-60"
+                      : "cursor-pointer hover:border-brand-primary"
+                  }`}
+                >
                   <span className="text-2xl leading-none text-brand-primary">
                     +
                   </span>
@@ -179,6 +188,7 @@ export function PaymentMethodEditorModal({
                     type="file"
                     accept="image/*"
                     className="hidden"
+                    disabled={uploadLocked}
                     onChange={(e) => {
                       const f = e.target.files?.[0];
                       if (f) pickQr(f);

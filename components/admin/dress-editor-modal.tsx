@@ -176,6 +176,9 @@ export function DressEditorModal({
   /* --------------------------- save/delete ----------------------- */
 
   const canSave = name.trim().length > 0 && photos.length > 0 && !uploading;
+  // Lock the upload tiles while a file is uploading or the save is in flight —
+  // a photo added mid-save wouldn't make it into the row being written.
+  const uploadLocked = uploading || isPending;
 
   function handleSave() {
     setError(null);
@@ -300,7 +303,13 @@ export function DressEditorModal({
                     </div>
                   ))}
                   {/* Add-photo tile */}
-                  <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center gap-1 rounded-sm border border-dashed border-border-strong bg-white px-2 text-center text-body-sm text-text-secondary hover:border-brand-primary">
+                  <label
+                    className={`flex min-h-28 flex-col items-center justify-center gap-1 rounded-sm border border-dashed border-border-strong bg-white px-2 text-center text-body-sm text-text-secondary ${
+                      uploadLocked
+                        ? "cursor-not-allowed opacity-60"
+                        : "cursor-pointer hover:border-brand-primary"
+                    }`}
+                  >
                     <span className="text-xl leading-none text-brand-primary">
                       +
                     </span>
@@ -309,6 +318,7 @@ export function DressEditorModal({
                       type="file"
                       accept="image/*"
                       className="hidden"
+                      disabled={uploadLocked}
                       onChange={(e) => {
                         const f = e.target.files?.[0];
                         if (f) addProductPhoto(f);
@@ -372,7 +382,13 @@ export function DressEditorModal({
                         value={revName}
                         onChange={(e) => setRevName(e.target.value)}
                       />
-                      <label className="flex min-h-tap cursor-pointer items-center gap-2 rounded-sm border border-dashed border-border-strong bg-white px-3 text-body-sm text-text-secondary hover:border-brand-primary">
+                      <label
+                        className={`flex min-h-tap items-center gap-2 rounded-sm border border-dashed border-border-strong bg-white px-3 text-body-sm text-text-secondary ${
+                          uploadLocked
+                            ? "cursor-not-allowed opacity-60"
+                            : "cursor-pointer hover:border-brand-primary"
+                        }`}
+                      >
                         {revPhoto ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
@@ -388,6 +404,7 @@ export function DressEditorModal({
                           type="file"
                           accept="image/*"
                           className="hidden"
+                          disabled={uploadLocked}
                           onChange={(e) => {
                             const f = e.target.files?.[0];
                             if (f) pickReviewPhoto(f);

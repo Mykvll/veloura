@@ -61,16 +61,22 @@ export function BookingsManager({ bookings }: { bookings: AdminBooking[] }) {
   // the card with an action in flight (to disable its buttons).
   const [proofView, setProofView] = useState<AdminBooking | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  // Which card+button has an action in flight — the kind lets each button show
+  // its own "…ing" label instead of all of them changing at once.
+  const [busy, setBusy] = useState<{ id: string; kind: "verify" | "invalid" | "delete" } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
-  function run(id: string, action: (id: string) => Promise<{ error: string | null }>) {
+  function run(
+    id: string,
+    kind: "verify" | "invalid" | "delete",
+    action: (id: string) => Promise<{ error: string | null }>,
+  ) {
     setError(null);
-    setBusyId(id);
+    setBusy({ id, kind });
     startTransition(async () => {
       const res = await action(id);
-      setBusyId(null);
+      setBusy(null);
       if (res.error) {
         setError(res.error);
         return;
@@ -99,7 +105,7 @@ export function BookingsManager({ bookings }: { bookings: AdminBooking[] }) {
         ) : (
           bookings.map((b) => {
             const meta = STATUS_META[b.status] ?? STATUS_META.pending;
-            const busy = busyId === b.id;
+            const cardBusy = busy?.id === b.id;
             return (
               <div
                 key={b.id}
@@ -149,22 +155,22 @@ export function BookingsManager({ bookings }: { bookings: AdminBooking[] }) {
                   {b.status !== "verified" && b.proofUrl ? (
                     <button
                       type="button"
-                      onClick={() => run(b.id, verifyBooking)}
-                      disabled={busy}
+                      onClick={() => run(b.id, "verify", verifyBooking)}
+                      disabled={cardBusy}
                       className="inline-flex min-h-tap items-center justify-center rounded-pill bg-state-success px-3.5 text-label-sm uppercase tracking-wide text-text-on-primary transition-colors disabled:opacity-60"
                     >
-                      {busy ? "Working…" : "Verify"}
+                      {cardBusy && busy?.kind === "verify" ? "Verifying…" : "Verify"}
                     </button>
                   ) : null}
 
                   {b.status === "pending" ? (
                     <button
                       type="button"
-                      onClick={() => run(b.id, flagBookingInvalid)}
-                      disabled={busy}
+                      onClick={() => run(b.id, "invalid", flagBookingInvalid)}
+                      disabled={cardBusy}
                       className="inline-flex min-h-tap items-center justify-center rounded-pill border border-state-error bg-white px-3.5 text-label-sm uppercase tracking-wide text-state-error transition-colors hover:bg-background-panel disabled:opacity-60"
                     >
-                      Mark invalid
+                      {cardBusy && busy?.kind === "invalid" ? "Marking…" : "Mark invalid"}
                     </button>
                   ) : null}
 
@@ -173,16 +179,16 @@ export function BookingsManager({ bookings }: { bookings: AdminBooking[] }) {
                       Delete &amp; free the dates?
                       <button
                         type="button"
-                        onClick={() => run(b.id, deleteBooking)}
-                        disabled={busy}
+                        onClick={() => run(b.id, "delete", deleteBooking)}
+                        disabled={cardBusy}
                         className="inline-flex min-h-tap items-center justify-center rounded-pill bg-state-error px-3.5 text-label-sm uppercase tracking-wide text-text-on-primary transition-colors disabled:opacity-60"
                       >
-                        {busy ? "Deleting…" : "Yes, delete"}
+                        {cardBusy && busy?.kind === "delete" ? "Deleting…" : "Yes, delete"}
                       </button>
                       <button
                         type="button"
                         onClick={() => setConfirmId(null)}
-                        disabled={busy}
+                        disabled={cardBusy}
                         className="inline-flex min-h-tap items-center justify-center rounded-pill border border-border-soft bg-white px-3.5 text-label-sm uppercase tracking-wide text-text-primary transition-colors hover:bg-background-panel disabled:opacity-60"
                       >
                         Keep

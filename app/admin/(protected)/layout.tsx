@@ -2,8 +2,8 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AdminNav } from "@/components/admin/admin-nav";
+import { SignOutButton } from "@/components/admin/sign-out-button";
 import { SiteFooter } from "@/components/site-footer";
-import { signOut } from "../actions";
 
 // The session comes from cookies, so anything under here is per-request, never
 // statically cached.
@@ -76,15 +76,9 @@ export default async function AdminLayout({
             <span className="hidden text-body-sm text-text-secondary xl:inline">
               {user.email}
             </span>
-            {/* Sign out is a server action, so no client JS is needed here. */}
-            <form action={signOut}>
-              <button
-                type="submit"
-                className="min-h-tap rounded-pill border border-border-soft px-4 text-label-sm uppercase tracking-label text-text-secondary transition-fast hover:bg-background-panel hover:text-text-heading focus-visible:shadow-focus"
-              >
-                Sign out
-              </button>
-            </form>
+            {/* Sign out still runs as a server action; the client wrapper only
+                adds the "Signing out…" pending state on the button. */}
+            <SignOutButton />
           </div>
         </div>
       </header>

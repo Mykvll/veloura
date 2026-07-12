@@ -43,8 +43,11 @@ export function DressManager({ dresses }: { dresses: AdminDress[] }) {
               onClick={() => setEditing(d)}
               className="@container group relative flex flex-col overflow-hidden rounded-lg border border-border-soft bg-background-card text-left shadow-card transition duration-medium ease-soft hover:-translate-y-[3px] hover:shadow-float focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-brand-primary/35"
             >
-              {/* Cover */}
-              <div className="relative aspect-[3/4] w-full bg-background-panel">
+              {/* Cover. min-h-0 matters: as a flex item this box's min-height
+                  defaults to the photo's intrinsic height, so a photo taller
+                  than 3:4 would stretch the frame (and the whole grid row)
+                  past the aspect ratio. */}
+              <div className="relative aspect-[3/4] min-h-0 w-full bg-background-panel">
                 {cover ? (
                   // Plain <img>: admin-only, avoids next/image layout overhead.
                   // eslint-disable-next-line @next/next/no-img-element
