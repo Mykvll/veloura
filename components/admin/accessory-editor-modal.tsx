@@ -60,7 +60,7 @@ export function AccessoryEditorModal({
   const [id] = useState(() => accessory?.id ?? crypto.randomUUID());
 
   const [name, setName] = useState(accessory?.name ?? "");
-  // Sensible starting values matching the prototype's "blank" accessory.
+  // Sensible starting values for a blank accessory.
   const [price, setPrice] = useState<number>(accessory?.price ?? 80);
   const [cost, setCost] = useState<number>(accessory?.cost ?? 200);
   const [stock, setStock] = useState<number>(accessory?.stock ?? 1);

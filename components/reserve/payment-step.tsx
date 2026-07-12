@@ -37,15 +37,14 @@ export type PaymentOption = {
   qrUrl: string | null;
 };
 
-/** A diagonal-stripe "placeholder" fill — the same treatment the prototype uses
- *  for the not-yet-uploaded QR / detail shots. */
+/** A diagonal-stripe "placeholder" fill for not-yet-uploaded QR / detail shots. */
 const stripe =
   "repeating-linear-gradient(45deg,#F1E8D8,#F1E8D8 10px,#F7F1E6 10px,#F7F1E6 20px)";
 
 /**
- * The payment step — the final step of the reserve wizard (design/index.html →
- * PaymentStep). Shows the amount due, a payment-channel picker, a QR placeholder
- * for the chosen channel, and a receipt upload. Submitting writes the booking.
+ * The payment step — the final step of the reserve wizard. Shows the amount
+ * due, a payment-channel picker, a QR placeholder for the chosen channel, and
+ * a receipt upload. Submitting writes the booking.
  *
  * WHY THE BOOKING IS SAVED HERE (not earlier): a visitor (`anon`) can only
  * INSERT a booking, never UPDATE it (see the RLS policies in the data model). So

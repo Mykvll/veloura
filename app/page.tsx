@@ -15,10 +15,9 @@ import type { BlockedDate } from "@/components/availability-calendar";
 export const dynamic = "force-dynamic";
 
 /**
- * The hero at the top of the one-pager (design/index.html → <Hero />): round
- * logo, the gold display-serif tagline, the uppercase occasions line, and a
- * gold pill CTA that smooth-scrolls to #collection (html has `scroll-smooth`).
- * All static, so it lives right here in the server page.
+ * The hero at the top of the one-pager: round logo, the tagline, the uppercase
+ * occasions line, and a pill CTA that smooth-scrolls to #collection (html has
+ * `scroll-smooth`). All static, so it lives right here in the server page.
  */
 function Hero() {
   return (
@@ -177,9 +176,9 @@ export default async function Home() {
     };
   });
 
-  // The one-pager, in the prototype's stacked order:
-  // NavBar → Hero → Our Collection → FAQ → footer. The dress detail / reserve /
-  // payment flow is a modal wizard opened from a DressCard — never a route.
+  // The one-pager, in stacked order: NavBar → Hero → Our Collection → FAQ →
+  // footer. The dress detail / reserve / payment flow is a modal wizard opened
+  // from a DressCard — never a route.
   return (
     <div id="top">
       <SiteHeader />

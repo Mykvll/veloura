@@ -13,8 +13,7 @@ export type DressCardData = {
   coverUrl: string | null;
 };
 
-// Diagonal ivory stripes used as the "no photo yet" placeholder — this is the
-// exact treatment the design prototype uses for a dress without a cover shot.
+// Diagonal ivory stripes used as the "no photo yet" placeholder.
 // Tokens: background-panel (#F1E8D8 / ivory-200) over background-card (#FDFAF4).
 const STRIPED_PLACEHOLDER =
   "repeating-linear-gradient(45deg, #F1E8D8, #F1E8D8 10px, #FDFAF4 10px, #FDFAF4 20px)";
@@ -22,19 +21,8 @@ const STRIPED_PLACEHOLDER =
 /**
  * A single dress in the collection grid.
  *
- * This mirrors the design prototype's DressCard (ui_kits/webapp + the design
- * system's DressCard.jsx):
- *  - card surface `bg-background-card`, `rounded-lg` (20px), `shadow-card`,
- *    soft hairline border; on hover it lifts 3px to `shadow-float`
- *  - portrait 3:4 cover photo
- *  - CENTER-aligned text block
- *  - name in the display serif, gold, uppercase; the size scales with the card
- *    width via a container query (bigger on desktop, smaller in the 2-col
- *    mobile grid) — that's what the prototype's clamp(16px, 11cqw, 24px) does
- *  - style name as a small UPPERCASE muted label
- *  - price like "₱500 (2 days)" in brown (text.heading), qualifier muted —
- *    matching the prototype card (the gold title-color rule covers serif TITLES,
- *    not the price line here)
+ * The name sizes itself against the card's own width via a container query
+ * (bigger on desktop, smaller in the 2-col mobile grid).
  *
  * Tapping the card opens the dress-detail modal (the first step of the
  * reservation wizard) via `onClick` — it no longer navigates to a separate
@@ -69,7 +57,7 @@ export function DressCard({
             className="object-cover"
           />
         ) : (
-          // No photo yet — keep the frame with the prototype's striped placeholder.
+          // No photo yet — keep the frame with a striped placeholder.
           <div
             className="flex h-full items-center justify-center text-label-sm uppercase text-text-secondary"
             style={{ background: STRIPED_PLACEHOLDER }}
@@ -79,7 +67,6 @@ export function DressCard({
         )}
       </div>
 
-      {/* Text block — centered, matching the prototype. */}
       <div className="p-4 text-center">
         <h3 className="font-display font-semibold uppercase leading-[1.2] tracking-wide text-text-accent text-[clamp(1rem,11cqi,1.5rem)] break-words">
           {dress.name}

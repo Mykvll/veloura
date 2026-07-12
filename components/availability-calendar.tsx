@@ -37,9 +37,9 @@ function niceDate(iso: string) {
 }
 
 /**
- * The reserve-flow availability calendar (design/index.html →
- * AvailabilityCalendar). A month grid you can page through with ‹ / › and a
- * "Jump to today" shortcut. Which days are pickable depends on the mode:
+ * The reserve-flow availability calendar: a month grid you can page through
+ * with ‹ / › and a "Jump to today" shortcut. Which days are pickable depends
+ * on the mode:
  *
  *  - RENT: only days when THIS dress is blocked (its rental + wash day) are
  *    disabled. A day when a *different* dress is out still shows a red dot

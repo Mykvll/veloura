@@ -77,9 +77,7 @@ export function DressEditorModal({
 
   const [name, setName] = useState(dress?.name ?? "");
   const [styleName, setStyleName] = useState(dress?.styleName ?? "");
-  // Price has no field in the editor design yet — carry the existing value
-  // through on save (new dresses use the DB default of ₱500).
-  const price = dress?.price ?? 500;
+  const [price, setPrice] = useState<number>(dress?.price ?? 500);
   const [cost, setCost] = useState<number>(dress?.cost ?? 0);
   const [photos, setPhotos] = useState<PhotoDraft[]>(dress?.photos ?? []);
   const [sizes, setSizes] = useState<SizeDraft[]>(dress?.sizes ?? []);
@@ -438,22 +436,34 @@ export function DressEditorModal({
                   onChange={(e) => setStyleName(e.target.value)}
                 />
               </div>
-              {/* Price has no visible field in the editor design yet. Keep it
-                  as a hidden field (default ₱500, or the dress's existing
-                  value) so it's wired for when a real control is designed. */}
-              <input type="hidden" name="price" value={price} readOnly />
-
-              <div>
-                <FieldLabel hint="what you paid — feeds Analytics">
-                  Acquisition cost (₱)
-                </FieldLabel>
-                <input
-                  type="number"
-                  min={0}
-                  className={inputClass}
-                  value={cost}
-                  onChange={(e) => setCost(Number(e.target.value))}
-                />
+              {/* Rent price + acquisition cost side by side, per the design.
+                  mt-auto keeps the two inputs bottom-aligned when one label
+                  wraps to a second line on narrow screens. */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col">
+                  <FieldLabel required hint="shown to renters">
+                    Rent price (₱)
+                  </FieldLabel>
+                  <input
+                    type="number"
+                    min={0}
+                    className={`${inputClass} mt-auto`}
+                    value={price}
+                    onChange={(e) => setPrice(Number(e.target.value))}
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <FieldLabel hint="feeds Analytics">
+                    Acquisition cost (₱)
+                  </FieldLabel>
+                  <input
+                    type="number"
+                    min={0}
+                    className={`${inputClass} mt-auto`}
+                    value={cost}
+                    onChange={(e) => setCost(Number(e.target.value))}
+                  />
+                </div>
               </div>
 
               {/* Sizes — tap to toggle */}

@@ -51,7 +51,6 @@ export default {
         },
       },
       fontFamily: {
-        // "by CM" script (Alex Brush) is decorative only — never body/labels.
         display: ["var(--font-display)", "Georgia", "serif"],
         body: ["var(--font-body)", '"Helvetica Neue"', "sans-serif"],
         script: ["var(--font-script)", "cursive"],

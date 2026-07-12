@@ -99,7 +99,6 @@ export function AccessoriesManager({
                     <span className="truncate text-label-base uppercase tracking-wide text-text-heading">
                       {a.name}
                     </span>
-                    {/* Rental price — gold, per the title/accent colour rule. */}
                     <span className="flex-none text-price-base text-text-accent">
                       +{peso(a.price)}
                     </span>

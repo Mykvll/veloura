@@ -13,13 +13,10 @@ import { SectionTitle } from "./section-title";
 import { FITTING_LOCATION } from "@/lib/reserve";
 
 /**
- * The FAQ SECTION of the customer one-pager (design/index.html → <Faq />).
- *
- * The prototype keeps FAQ as a stacked section on "/" (reached by the nav's
- * smooth scroll), NOT a separate route — content lifted verbatim from its FAQS
- * list. Each question is an InfoBox-style cream card: gold icon chip +
- * uppercase question label (brown — labels are body-coloured, only serif
- * titles are gold), then the answer. Static content, so a server component.
+ * The FAQ section of the customer one-pager — a stacked section on "/"
+ * (reached by the nav's smooth scroll), NOT a separate route. Each question is
+ * a cream card: gold icon chip + uppercase question label, then the answer.
+ * Static content, so a server component.
  */
 const FAQS: { Icon: LucideIcon; q: string; a: string }[] = [
   {

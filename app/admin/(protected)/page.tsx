@@ -21,10 +21,8 @@ export const dynamic = "force-dynamic";
 /**
  * Admin dashboard (/admin) — the whole admin experience on ONE page.
  *
- * Like the admin.html prototype, every feature is a stacked SECTION on this
- * single route rather than its own page. So far two sections are built —
- * "Dresses" (#dresses) and "Accessories" (#accessories) — and the top nav
- * scrolls between them. (Analytics / Bookings / Calendar are later phases.)
+ * Every feature is a stacked SECTION on this single route rather than its own
+ * page, and the top nav scrolls between them.
  *
  * This is a server component: it fetches everything both sections need — every
  * dress with its child data + verified-rental counts, and every accessory —

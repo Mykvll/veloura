@@ -65,11 +65,11 @@ function Pill({
 }
 
 /**
- * The fitting form — step 2 of the reserve flow in fitting mode (see
- * design/index.html → FittingForm). Collects name, contact, a time slot (the
- * slots depend on weekday vs weekend; already-booked ones are disabled) and an
- * optional parking reservation, then saves a 'pending' fitting booking. The
- * date and slot are re-checked on the server before the row is written.
+ * The fitting form — step 2 of the reserve flow in fitting mode. Collects
+ * name, contact, a time slot (the slots depend on weekday vs weekend;
+ * already-booked ones are disabled) and an optional parking reservation, then
+ * saves a 'pending' fitting booking. The date and slot are re-checked on the
+ * server before the row is written.
  */
 export function FittingForm({
   dress,

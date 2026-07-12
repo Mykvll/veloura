@@ -13,8 +13,8 @@ import { SectionTitle } from "@/components/section-title";
 import type { AdminBooking } from "./types";
 
 /**
- * Status → label + colour + icon, mirroring the prototype's PAY_META.
- * Gold for "awaiting", olive for verified, clay/red for the two bad states.
+ * Status → label + colour + icon. Gold for "awaiting", olive for verified,
+ * clay/red for the two bad states.
  */
 const STATUS_META: Record<
   string,

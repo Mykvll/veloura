@@ -3,10 +3,8 @@
 /**
  * The admin section nav (client component).
  *
- * The admin experience is one page ("/admin") made of stacked sections, so these
- * links scroll to a section by id rather than navigating to a route — mirroring
- * the admin.html prototype's top nav. Only the sections that exist so far are
- * listed (Dresses, Accessories); more are added as they're built.
+ * The admin experience is one page ("/admin") made of stacked sections, so
+ * these links scroll to a section by id rather than navigating to a route.
  */
 const LINKS = [
   { id: "analytics", label: "Analytics" },

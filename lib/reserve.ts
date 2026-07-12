@@ -1,6 +1,6 @@
 // Shared reserve-flow helpers — imported by both the client forms and the
 // server action so the two always agree on delivery/fitting options and date
-// maths. Values come straight from the design prototype (index.html).
+// maths.
 
 /** Zero-pad to two digits ("7" → "07"). */
 export function pad(n: number): string {

@@ -24,9 +24,8 @@ type Tone = "gold" | "success" | "error";
 
 /**
  * One analytics stat card: icon chip, big value, uppercase label, optional
- * sub-line. Mirrors the admin.html prototype's Card. The value renders in
- * heading brown (a spec-style numeric readout, not a customer-facing price),
- * per the prototype.
+ * sub-line. The value renders in heading brown (a spec-style numeric readout,
+ * not a customer-facing price).
  */
 function StatCard({
   icon: Icon,

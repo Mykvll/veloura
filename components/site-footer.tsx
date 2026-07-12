@@ -1,14 +1,12 @@
 import { MapPin, Send, Heart } from "lucide-react";
 
 /**
- * The customer-site footer (design/index.html → <Footer />).
- *
- * Two stacked strips, matching the catalogue:
+ * The customer-site footer — two stacked strips:
  *  1. a tagline line on the page background, in gold italic display serif;
  *  2. the taupe contact band (brand.secondary) with white uppercase entries.
  *
- * These are static informational labels (not links), exactly as the prototype
- * has them, so no interactivity — this stays a server component.
+ * These are static informational labels (not links), so no interactivity —
+ * this stays a server component.
  */
 const CONTACT = [
   { Icon: MapPin, label: "Metro Manila" },
@@ -19,7 +17,6 @@ const CONTACT = [
 export function SiteFooter() {
   return (
     <footer>
-      {/* Tagline strip — gold italic, per the title colour rule. */}
       <div className="bg-background-page px-5 py-8 text-center">
         <p className="font-display text-display-md italic tracking-wide text-text-accent">
           Wear luxury, not the price.

@@ -1,14 +1,13 @@
 import Image from "next/image";
 
 /**
- * The customer-site header (design/index.html → <NavBar />).
+ * The customer-site header.
  *
  * A sticky bar with the round gold logo + VELOURA / "by CM" lockup on the left
  * and the two section links. The customer site is a ONE-PAGER: the links are
  * plain #anchors that smooth-scroll to the Collection and FAQ sections on "/"
- * (html has `scroll-smooth`), exactly like the prototype's onNavigate — no
- * route navigation anywhere. "Our Collection" carries the active gold
- * underline, as the prototype sets active="Our Collection".
+ * (html has `scroll-smooth`) — no route navigation anywhere. "Our Collection"
+ * carries the active gold underline.
  *
  * Responsive: at mobile widths (<720px, the brand breakpoint) the links drop
  * to a full-width row under the lockup, each keeping a 44px tap target.
@@ -41,7 +40,6 @@ export function SiteHeader() {
             <span className="font-display text-logo uppercase tracking-[0.14em] text-text-accent">
               VELOURA
             </span>
-            {/* Alex Brush is for the "by CM" signature ONLY. */}
             <span className="mt-0.5 font-script text-lg leading-none text-text-accent">
               by CM
             </span>
@@ -49,9 +47,9 @@ export function SiteHeader() {
         </a>
 
         {/* Links: truly centered on the bar on wide screens (absolutely
-            positioned at 50%, like the prototype NavBar — centering them in
-            the space beside the lockup would sit them right of centre); a
-            full-width row below the lockup on mobile (<720px). */}
+            positioned at 50% — centering them in the space beside the lockup
+            would sit them right of centre); a full-width row below the lockup
+            on mobile (<720px). */}
         <nav className="flex items-center gap-6 mobile:order-last mobile:w-full mobile:justify-center mobile:border-t mobile:border-background-panel min-[720px]:absolute min-[720px]:left-1/2 min-[720px]:top-1/2 min-[720px]:-translate-x-1/2 min-[720px]:-translate-y-1/2">
           {LINKS.map((l) => (
             <a

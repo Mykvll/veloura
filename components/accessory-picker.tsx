@@ -16,10 +16,10 @@ export type CustomerAccessory = {
 };
 
 /**
- * The accessories add-on picker for the reserve flow (design/index.html →
- * RentForm). One tappable row per accessory: a checkbox, a thumbnail (tap to
- * preview the full image), the name + "N available", and the "+₱price" add-on.
- * Tapping a row toggles it; out-of-stock rows are disabled.
+ * The accessories add-on picker for the reserve flow. One tappable row per
+ * accessory: a checkbox, a thumbnail (tap to preview the full image), the
+ * name + "N available", and the "+₱price" add-on. Tapping a row toggles it;
+ * out-of-stock rows are disabled.
  *
  * This is a CONTROLLED list — the selected ids and the running total live in the
  * parent (which also knows the dress price). It only owns the local preview
@@ -117,7 +117,6 @@ export function AccessoryPicker({
               </span>
             </span>
 
-            {/* Add-on price — gold, per the accent-colour rule. */}
             <span className="flex-none text-price-base text-text-accent">
               +₱{a.price}
             </span>

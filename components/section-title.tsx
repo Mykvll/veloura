@@ -1,14 +1,11 @@
 import type { ReactNode } from "react";
 
 /**
- * Centered display-serif section title with thin gold rules and ✦ sparkles —
- * a 1:1 port of the design system's <SectionTitle /> (components/display/
- * SectionTitle.jsx). Used by every stacked section on the customer one-pager
- * AND the admin page, so both match the prototypes.
+ * Centered display-serif section title with thin gold rules and ✦ sparkles.
+ * Used by every stacked section on the customer one-pager AND the admin page.
  *
  * Anatomy: gold hairline · ✦ TITLE ✦ · gold hairline, with an optional
- * uppercase letterspaced subtitle underneath. The title is gold display serif
- * per the brand title-colour rule.
+ * uppercase letterspaced subtitle underneath.
  */
 export function SectionTitle({
   children,

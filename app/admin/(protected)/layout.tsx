@@ -40,9 +40,8 @@ export default async function AdminLayout({
 
   return (
     <div className="flex min-h-full flex-col">
-      {/* Admin header — the prototype NavBar: round logo + VELOURA / "by CM"
-          lockup on the left, section links on the right. Sign-out stays (this
-          app is password-protected; the prototype has no auth). */}
+      {/* Admin header — round logo + VELOURA / "by CM" lockup on the left,
+          section links on the right, plus sign-out. */}
       <header className="sticky top-0 z-20 border-b border-border-soft bg-background-card">
         <div className="mx-auto flex w-full max-w-page-max flex-wrap items-center gap-x-5 gap-y-1 px-6 py-2.5">
           <span className="flex flex-none items-center gap-3">
@@ -58,7 +57,6 @@ export default async function AdminLayout({
               <span className="font-display text-logo uppercase tracking-[0.14em] text-text-accent">
                 VELOURA
               </span>
-              {/* Alex Brush is for the "by CM" signature ONLY. */}
               <span className="mt-0.5 font-script text-lg leading-none text-text-accent">
                 by CM
               </span>
@@ -68,8 +66,8 @@ export default async function AdminLayout({
           {/* Section links — right-aligned beside the lockup on wide screens.
               The admin bar carries six links + sign-out, so its "narrow" mode
               (links on their own full-width row under the lockup, scrolling
-              sideways if needed — the prototype NavBar's behaviour) applies
-              below lg, not just below the 720px brand breakpoint. */}
+              sideways if needed) applies below lg, not just below the 720px
+              brand breakpoint. */}
           <div className="flex flex-1 justify-end overflow-x-auto max-lg:order-last max-lg:w-full max-lg:flex-none max-lg:justify-start max-lg:border-t max-lg:border-background-panel">
             <AdminNav />
           </div>

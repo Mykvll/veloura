@@ -10,7 +10,7 @@ export type GalleryPhoto = {
 };
 
 /**
- * Photo slideshow for the dress-detail page (see design/index.html → DetailsLeft).
+ * Photo slideshow for the dress-detail page.
  *
  * A large "hero" image on the left with a column of thumbnails beside it. Tapping
  * a thumbnail swaps the hero. This needs client state (which slide is showing),

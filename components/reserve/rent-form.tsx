@@ -41,10 +41,10 @@ const inputClass =
   "min-h-tap w-full rounded-sm border border-border-soft bg-white px-4 py-2 text-body-base text-text-primary outline-none placeholder:text-text-secondary focus:border-border-accent focus:shadow-focus";
 
 /**
- * The rent form — step 2 of the reserve flow, shown beside the calendar (see
- * design/index.html → RentForm). Collects the renter's details, their valid ID,
- * the chosen accessories and a delivery time, then hands off to the payment step
- * (the booking is only saved once payment proof is submitted there).
+ * The rent form — step 2 of the reserve flow, shown beside the calendar.
+ * Collects the renter's details, their valid ID, the chosen accessories and a
+ * delivery time, then hands off to the payment step (the booking is only saved
+ * once payment proof is submitted there).
  *
  * ID UPLOAD: the ID goes to the PRIVATE `payment-proofs` bucket. As with the
  * admin editors, the file is uploaded straight from the browser and only its

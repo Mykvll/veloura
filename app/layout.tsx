@@ -19,7 +19,7 @@ const body = Poppins({
   display: "swap",
 });
 
-// Script — decorative ONLY, for the "by CM" lockup (font-script).
+// Script — the "by CM" lockup (font-script).
 const script = Alex_Brush({
   subsets: ["latin"],
   weight: "400",
@@ -44,7 +44,7 @@ export default function RootLayout({
       // applied in globals.css so every page inherits them.
       className={cn(
         // scroll-smooth: the one-pager's nav + hero CTA are plain #anchors;
-        // this gives them the prototype's smooth scrolling with no client JS.
+        // this gives them smooth scrolling with no client JS.
         "h-full scroll-smooth antialiased",
         display.variable,
         body.variable,

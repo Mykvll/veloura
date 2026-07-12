@@ -26,8 +26,7 @@ export type DressReview = {
 /**
  * Everything the detail modal needs for one dress. The home page fetches this
  * for every non-hidden dress up front and hands it to <CollectionGallery>, so
- * opening the modal is instant (no extra round-trip) — the same in-memory
- * approach the design prototype uses.
+ * opening the modal is instant (no extra round-trip).
  */
 export type DressDetail = {
   id: string;
@@ -48,9 +47,9 @@ export type DressDetail = {
  * <DressDetailsPanel> untouched.
  *
  * LAYOUT: a centered two-column dialog on desktop (gallery left, details right)
- * and a bottom-sheet on mobile — matching the prototype's split/bottom-sheet
- * treatment. Radix Dialog gives us focus-trapping, Esc-to-close, click-outside,
- * and body scroll-lock for free (it's the same primitive the admin editors use).
+ * and a bottom-sheet on mobile. Radix Dialog gives us focus-trapping,
+ * Esc-to-close, click-outside, and body scroll-lock for free (it's the same
+ * primitive the admin editors use).
  */
 export function DressDetailModal({
   dress,
@@ -88,7 +87,7 @@ export function DressDetailModal({
   const [payment, setPayment] = useState<RentContinueData | null>(null);
 
   // The renter photo open in the lightbox (null = closed). All review photos
-  // show as thumbnails inside it, like the prototype's "Photos from renters".
+  // show as thumbnails inside it.
   const [reviewPhoto, setReviewPhoto] = useState<string | null>(null);
   const reviewPhotos = dress.reviews
     .map((r) => r.photoUrl)
@@ -105,7 +104,7 @@ export function DressDetailModal({
   // the explicit Cancel button (with a warning) exits it.
   const locked = step === "payment";
 
-  // The header subtitle tracks the step (prototype's subtitleMap).
+  // The header subtitle tracks the step.
   const subtitle =
     step === "done"
       ? "Reservation received"
@@ -131,8 +130,8 @@ export function DressDetailModal({
           // corners. Desktop (md+): a centered card, up to 920px wide.
           className="fixed inset-x-0 bottom-0 z-50 flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-lg border border-border-soft bg-background-card shadow-float md:inset-auto md:left-1/2 md:top-1/2 md:bottom-auto md:w-[min(920px,94vw)] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-lg"
         >
-          {/* Header — centered dress name (gold display serif) + uppercase
-              style/step line, round ✕ in the corner, like the prototype Modal. */}
+          {/* Header — centered dress name + uppercase style/step line, round ✕
+              in the corner. */}
           <div className="relative border-b border-border-soft px-14 py-4 text-center">
             <Dialog.Title className="font-display text-display-lg uppercase tracking-display text-text-accent md:text-display-xl">
               {dress.name}
@@ -208,7 +207,7 @@ export function DressDetailModal({
               />
             ) : step === "date" ? (
               // Step 2: pick a date (left) and fill the reserve/fitting form
-              // (right) — the prototype's split "Reserve a date" step.
+              // (right).
               <div>
                 <button
                   type="button"
@@ -254,8 +253,8 @@ export function DressDetailModal({
               </div>
             ) : (
               /* Two columns on desktop, stacked on mobile. Left: slideshow +
-                 renter reviews under it (prototype DetailsLeft); right: sizes,
-                 measurements, fees, reserve (DetailsRight). */
+                 renter reviews under it; right: sizes, measurements, fees,
+                 reserve. */
               <div className="grid grid-cols-1 gap-10 md:grid-cols-2">
                 <div className="flex flex-col gap-3">
                   <DressGallery photos={dress.photos} dressName={dress.name} />
@@ -312,7 +311,7 @@ export function DressDetailModal({
           </div>
 
           {/* Renter-photo lightbox — heavy scrim, the tapped photo big, every
-              renter photo as a thumbnail (prototype's "Photos from renters"). */}
+              renter photo as a thumbnail. */}
           {reviewPhoto ? (
             <div
               onClick={(e) => {

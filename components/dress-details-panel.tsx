@@ -10,7 +10,7 @@ export type DressSize = {
   length_cm: number | null;
 };
 
-/** Turn centimetres into the "84 cm (33.07 in)" pair the prototype shows. */
+/** Turn centimetres into the displayed "84 cm (33.07 in)" pair. */
 function formatMeasurement(cm: number | null): { cm: string; inches: string } | null {
   if (cm == null) return null;
   return { cm: `${cm} cm`, inches: `${(cm / 2.54).toFixed(2)} in` };
@@ -34,13 +34,12 @@ function SpecRow({ label, cm }: { label: string; cm: number | null }) {
 }
 
 /**
- * Right column of the dress-detail page (see design/index.html → DetailsRight):
- * pick a size, read that size's measurements, see the fees, and reserve.
+ * Right column of the dress-detail page: pick a size, read that size's
+ * measurements, see the fees, and reserve.
  *
  * Choosing a size swaps the measurements shown, so this holds client state.
- * Fees below (deposit, per-extra-day) are fixed business rules from the design.
- * Accessories are NOT chosen here — like the prototype, they live in the rent
- * form (step 2), so this column is just sizes, fees, and the two actions.
+ * Accessories are NOT chosen here — they live in the rent form (step 2), so
+ * this column is just sizes, fees, and the two actions.
  */
 export function DressDetailsPanel({
   sizes,
@@ -136,7 +135,7 @@ export function DressDetailsPanel({
       </p>
 
       {/* Reserve / fitting actions — both open the availability calendar (in
-          rent or fitting mode). Matches the prototype's DetailsRight. */}
+          rent or fitting mode). */}
       <button
         type="button"
         onClick={onReserve}
