@@ -12,6 +12,7 @@ const LINKS = [
   { id: "accessories", label: "Accessories" },
   { id: "payments", label: "Payments" },
   { id: "bookings", label: "Bookings" },
+  { id: "history", label: "History" },
   { id: "calendar", label: "Calendar" },
 ] as const;
 

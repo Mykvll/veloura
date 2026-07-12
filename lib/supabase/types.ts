@@ -281,6 +281,47 @@ export type Database = {
         }
         Relationships: []
       }
+      rental_history: {
+        Row: {
+          amount_paid: number
+          created_at: string | null
+          dress_id: string | null
+          dress_name: string
+          end_date: string
+          id: string
+          renter_name: string
+          start_date: string
+        }
+        Insert: {
+          amount_paid: number
+          created_at?: string | null
+          dress_id?: string | null
+          dress_name: string
+          end_date: string
+          id?: string
+          renter_name: string
+          start_date: string
+        }
+        Update: {
+          amount_paid?: number
+          created_at?: string | null
+          dress_id?: string | null
+          dress_name?: string
+          end_date?: string
+          id?: string
+          renter_name?: string
+          start_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rental_history_dress_id_fkey"
+            columns: ["dress_id"]
+            isOneToOne: false
+            referencedRelation: "dresses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reviews: {
         Row: {
           body: string
