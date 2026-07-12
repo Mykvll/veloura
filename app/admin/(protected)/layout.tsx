@@ -65,9 +65,17 @@ export default async function AdminLayout({
             </span>
           </span>
 
-          <div className="flex flex-1 flex-wrap items-center justify-end gap-x-4 gap-y-1">
+          {/* Section links — right-aligned beside the lockup on wide screens.
+              The admin bar carries six links + sign-out, so its "narrow" mode
+              (links on their own full-width row under the lockup, scrolling
+              sideways if needed — the prototype NavBar's behaviour) applies
+              below lg, not just below the 720px brand breakpoint. */}
+          <div className="flex flex-1 justify-end overflow-x-auto max-lg:order-last max-lg:w-full max-lg:flex-none max-lg:justify-start max-lg:border-t max-lg:border-background-panel">
             <AdminNav />
-            <span className="hidden text-body-sm text-text-secondary lg:inline">
+          </div>
+
+          <div className="ml-auto flex flex-none items-center gap-3">
+            <span className="hidden text-body-sm text-text-secondary xl:inline">
               {user.email}
             </span>
             {/* Sign out is a server action, so no client JS is needed here. */}

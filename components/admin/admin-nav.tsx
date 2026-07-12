@@ -26,7 +26,9 @@ export function AdminNav() {
   }
 
   return (
-    <nav className="flex items-center gap-1">
+    // whitespace-nowrap + flex-none links: on narrow screens the parent row
+    // scrolls horizontally instead of clipping the last links.
+    <nav className="flex items-center gap-1 whitespace-nowrap">
       {LINKS.map((l) => (
         <a
           key={l.id}
@@ -35,7 +37,7 @@ export function AdminNav() {
             e.preventDefault();
             scrollToSection(l.id);
           }}
-          className="min-h-tap rounded-sm px-3 py-2 text-label-sm uppercase tracking-label text-text-secondary transition-fast hover:text-text-heading"
+          className="flex min-h-tap flex-none items-center rounded-sm px-3 text-label-sm uppercase tracking-label text-text-secondary transition-fast hover:text-text-heading"
         >
           {l.label}
         </a>

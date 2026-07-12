@@ -22,7 +22,7 @@ const LINKS = [
 export function SiteHeader() {
   return (
     <header className="sticky top-0 z-20 border-b border-border-soft bg-background-card">
-      <div className="mx-auto flex w-full max-w-page-max flex-wrap items-center gap-x-8 gap-y-0 px-6 py-2.5">
+      <div className="relative mx-auto flex w-full max-w-page-max flex-wrap items-center gap-x-8 gap-y-0 px-6 py-2.5">
         {/* Logo lockup → back to the top. Round logo + gold wordmark. */}
         <a
           href="#top"
@@ -48,8 +48,11 @@ export function SiteHeader() {
           </span>
         </a>
 
-        {/* Links: centered on wide screens; a full-width row below on mobile. */}
-        <nav className="flex flex-1 items-center justify-center gap-6 mobile:order-last mobile:w-full mobile:flex-none mobile:justify-center mobile:border-t mobile:border-background-panel">
+        {/* Links: truly centered on the bar on wide screens (absolutely
+            positioned at 50%, like the prototype NavBar — centering them in
+            the space beside the lockup would sit them right of centre); a
+            full-width row below the lockup on mobile (<720px). */}
+        <nav className="flex items-center gap-6 mobile:order-last mobile:w-full mobile:justify-center mobile:border-t mobile:border-background-panel min-[720px]:absolute min-[720px]:left-1/2 min-[720px]:top-1/2 min-[720px]:-translate-x-1/2 min-[720px]:-translate-y-1/2">
           {LINKS.map((l) => (
             <a
               key={l.href}
