@@ -116,7 +116,8 @@ export function DressEditorModal({
       const url = await uploadToBucket(file, "");
       setPhotos((prev) => [...prev, { url, label: "Front" }]);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Photo upload failed.");
+      console.error("Dress photo upload failed", e);
+      setError("Couldn't upload the photo. Please try again.");
     } finally {
       setUploading(false);
     }
@@ -128,7 +129,8 @@ export function DressEditorModal({
     try {
       setRevPhoto(await uploadToBucket(file, "reviews/"));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Photo upload failed.");
+      console.error("Dress photo upload failed", e);
+      setError("Couldn't upload the photo. Please try again.");
     } finally {
       setUploading(false);
     }
@@ -407,7 +409,7 @@ export function DressEditorModal({
                       type="button"
                       onClick={addReview}
                       disabled={!revName.trim() || !revText.trim()}
-                      className="self-start rounded-pill border border-border-strong px-4 py-1.5 text-label-sm uppercase tracking-label text-text-primary transition-colors hover:bg-background-panel disabled:opacity-50"
+                      className="self-start rounded-pill border border-border-strong inline-flex min-h-tap items-center justify-center px-4 text-label-sm uppercase tracking-label text-text-primary transition-colors hover:bg-background-panel disabled:opacity-50"
                     >
                       Add review
                     </button>
@@ -559,7 +561,7 @@ export function DressEditorModal({
                         type="button"
                         onClick={handleDelete}
                         disabled={isPending}
-                        className="rounded-pill bg-state-error px-4 py-1.5 text-label-sm uppercase tracking-label text-text-on-primary transition-colors disabled:opacity-60"
+                        className="rounded-pill bg-state-error inline-flex min-h-tap items-center justify-center px-4 text-label-sm uppercase tracking-label text-text-on-primary transition-colors disabled:opacity-60"
                       >
                         {isPending ? "Removing…" : "Yes, remove"}
                       </button>
@@ -567,7 +569,7 @@ export function DressEditorModal({
                         type="button"
                         onClick={() => setConfirmDel(false)}
                         disabled={isPending}
-                        className="rounded-pill border border-border-strong px-4 py-1.5 text-label-sm uppercase tracking-label text-text-secondary transition-colors hover:bg-background-panel disabled:opacity-60"
+                        className="rounded-pill border border-border-strong inline-flex min-h-tap items-center justify-center px-4 text-label-sm uppercase tracking-label text-text-secondary transition-colors hover:bg-background-panel disabled:opacity-60"
                       >
                         Keep dress
                       </button>

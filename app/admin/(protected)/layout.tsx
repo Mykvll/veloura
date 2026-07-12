@@ -1,6 +1,8 @@
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AdminNav } from "@/components/admin/admin-nav";
+import { SiteFooter } from "@/components/site-footer";
 import { signOut } from "../actions";
 
 // The session comes from cookies, so anything under here is per-request, never
@@ -38,25 +40,49 @@ export default async function AdminLayout({
 
   return (
     <div className="flex min-h-full flex-col">
-      {/* Admin header */}
-      <header className="border-b border-border-soft bg-background-card">
-        <div className="mx-auto flex w-full max-w-page-max items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-6">
-            <span className="font-display text-display-md uppercase tracking-display text-text-accent">
-              Veloura Admin
+      {/* Admin header — the prototype NavBar: round logo + VELOURA / "by CM"
+          lockup on the left, section links on the right. Sign-out stays (this
+          app is password-protected; the prototype has no auth). */}
+      <header className="sticky top-0 z-20 border-b border-border-soft bg-background-card">
+        <div className="mx-auto flex w-full max-w-page-max flex-wrap items-center gap-x-5 gap-y-1 px-6 py-2.5">
+          <span className="flex flex-none items-center gap-3">
+            <Image
+              src="/veloura-logo.png"
+              alt=""
+              width={44}
+              height={44}
+              className="h-9 w-9 rounded-full md:h-11 md:w-11"
+              priority
+            />
+            <span className="flex flex-col leading-none">
+              <span className="font-display text-logo uppercase tracking-[0.14em] text-text-accent">
+                VELOURA
+              </span>
+              {/* Alex Brush is for the "by CM" signature ONLY. */}
+              <span className="mt-0.5 font-script text-lg leading-none text-text-accent">
+                by CM
+              </span>
             </span>
+          </span>
+
+          {/* Section links — right-aligned beside the lockup on wide screens.
+              The admin bar carries six links + sign-out, so its "narrow" mode
+              (links on their own full-width row under the lockup, scrolling
+              sideways if needed — the prototype NavBar's behaviour) applies
+              below lg, not just below the 720px brand breakpoint. */}
+          <div className="flex flex-1 justify-end overflow-x-auto max-lg:order-last max-lg:w-full max-lg:flex-none max-lg:justify-start max-lg:border-t max-lg:border-background-panel">
             <AdminNav />
           </div>
 
-          <div className="flex items-center gap-4">
-            <span className="hidden text-body-sm text-text-secondary sm:inline">
+          <div className="ml-auto flex flex-none items-center gap-3">
+            <span className="hidden text-body-sm text-text-secondary xl:inline">
               {user.email}
             </span>
             {/* Sign out is a server action, so no client JS is needed here. */}
             <form action={signOut}>
               <button
                 type="submit"
-                className="min-h-tap rounded-sm border border-border-soft px-4 text-label-sm uppercase tracking-label text-text-secondary transition-fast hover:bg-background-panel hover:text-text-heading focus-visible:shadow-focus"
+                className="min-h-tap rounded-pill border border-border-soft px-4 text-label-sm uppercase tracking-label text-text-secondary transition-fast hover:bg-background-panel hover:text-text-heading focus-visible:shadow-focus"
               >
                 Sign out
               </button>
@@ -68,6 +94,10 @@ export default async function AdminLayout({
       <main className="mx-auto w-full max-w-page-max flex-1 px-6 py-12">
         {children}
       </main>
+
+      {/* Same tagline + taupe contact band as the customer site (admin.html
+          ends with the shared <Footer />). */}
+      <SiteFooter />
     </div>
   );
 }

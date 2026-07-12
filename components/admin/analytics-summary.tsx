@@ -10,6 +10,7 @@ import {
   Wallet,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { SectionTitle } from "@/components/section-title";
 import type { AnalyticsData } from "./types";
 
 /** Peso formatter, matching the rest of the admin UI. */
@@ -81,15 +82,10 @@ export function AnalyticsSummary({ data }: { data: AnalyticsData }) {
 
   return (
     <div>
-      {/* Header — title (gold) + subtitle, same pattern as the other sections. */}
-      <div>
-        <h1 className="font-display text-display-lg uppercase tracking-display text-text-accent">
-          Analytics
-        </h1>
-        <p className="mt-1 text-body-sm text-text-secondary">
-          Verified rentals only — updates as you verify or delete bookings.
-        </p>
-      </div>
+      {/* Centered gold section title with sparkles, like every admin section. */}
+      <SectionTitle subtitle="Verified rentals only — updates as you verify or delete bookings">
+        Analytics
+      </SectionTitle>
 
       <div className="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
         <StatCard

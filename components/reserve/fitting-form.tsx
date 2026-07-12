@@ -261,7 +261,7 @@ export function FittingForm({
         type="button"
         onClick={handleSubmit}
         disabled={!canSubmit || isPending}
-        className="flex min-h-tap w-full items-center justify-center rounded-lg bg-brand-primary px-6 text-label-base uppercase tracking-label text-text-on-primary transition-fast hover:bg-brand-primary-hover disabled:opacity-50"
+        className="flex h-[52px] w-full items-center justify-center rounded-pill bg-brand-primary px-6 text-label-base uppercase tracking-label text-text-on-primary transition-fast hover:bg-brand-primary-hover active:bg-brand-primary-active disabled:opacity-50"
       >
         {isPending
           ? "Booking…"

@@ -80,7 +80,8 @@ export function PaymentMethodEditorModal({
         .publicUrl;
       setQrUrl(url);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "QR upload failed.");
+      console.error("QR upload failed", e);
+      setError("Couldn't upload the QR code. Please try again.");
     } finally {
       setUploading(false);
     }

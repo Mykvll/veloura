@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AccessoryEditorModal } from "./accessory-editor-modal";
 import { deleteAccessory } from "@/app/admin/(protected)/accessory-actions";
+import { SectionTitle } from "@/components/section-title";
 import type { AdminAccessory } from "./types";
 
 /** Peso formatter, matching the rest of the admin UI. */
@@ -48,17 +49,11 @@ export function AccessoriesManager({
 
   return (
     <div>
-      {/* Header — title + count */}
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <div>
-          <h1 className="font-display text-display-lg uppercase tracking-display text-text-accent">
-            Accessories
-          </h1>
-          <p className="mt-1 text-body-sm text-text-secondary">
-            Limited stock — customers can add these to a rental until they run
-            out.
-          </p>
-        </div>
+      {/* Centered section title + count badge under it (admin.html). */}
+      <SectionTitle subtitle="Limited stock — customers can add these to a rental until they run out">
+        Accessories
+      </SectionTitle>
+      <div className="mt-3.5 flex justify-center">
         <span className="rounded-pill border border-border-strong px-3 py-1 text-label-sm uppercase tracking-label text-text-secondary">
           {accessories.length}{" "}
           {accessories.length === 1 ? "accessory" : "accessories"}
@@ -133,7 +128,7 @@ export function AccessoriesManager({
                       type="button"
                       onClick={() => handleDelete(a.id)}
                       disabled={isPending}
-                      className="rounded-pill bg-state-error px-4 py-1.5 text-label-sm uppercase tracking-label text-text-on-primary transition-colors disabled:opacity-60"
+                      className="rounded-pill bg-state-error inline-flex min-h-tap items-center justify-center px-4 text-label-sm uppercase tracking-label text-text-on-primary transition-colors disabled:opacity-60"
                     >
                       {isPending ? "Removing…" : "Yes, remove"}
                     </button>
@@ -141,7 +136,7 @@ export function AccessoriesManager({
                       type="button"
                       onClick={() => setConfirmId(null)}
                       disabled={isPending}
-                      className="rounded-pill border border-border-strong px-4 py-1.5 text-label-sm uppercase tracking-label text-text-secondary transition-colors hover:bg-background-panel disabled:opacity-60"
+                      className="rounded-pill border border-border-strong inline-flex min-h-tap items-center justify-center px-4 text-label-sm uppercase tracking-label text-text-secondary transition-colors hover:bg-background-panel disabled:opacity-60"
                     >
                       Keep
                     </button>
@@ -151,7 +146,7 @@ export function AccessoriesManager({
                     <button
                       type="button"
                       onClick={() => setEditing(a)}
-                      className="rounded-pill border border-border-strong px-4 py-1.5 text-label-sm uppercase tracking-label text-text-primary transition-colors hover:bg-background-panel"
+                      className="rounded-pill border border-border-strong inline-flex min-h-tap items-center justify-center px-4 text-label-sm uppercase tracking-label text-text-primary transition-colors hover:bg-background-panel"
                     >
                       Edit
                     </button>
@@ -161,7 +156,7 @@ export function AccessoriesManager({
                         setError(null);
                         setConfirmId(a.id);
                       }}
-                      className="rounded-pill px-4 py-1.5 text-label-sm uppercase tracking-label text-state-error transition-colors hover:bg-background-panel"
+                      className="rounded-pill inline-flex min-h-tap items-center justify-center px-4 text-label-sm uppercase tracking-label text-state-error transition-colors hover:bg-background-panel"
                     >
                       Remove
                     </button>

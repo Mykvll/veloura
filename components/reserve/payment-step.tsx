@@ -103,7 +103,8 @@ export function PaymentStep({
       setProofPath(path);
       setProofPreview(URL.createObjectURL(file));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Upload failed.");
+      console.error("Payment proof upload failed", e);
+      setError("Sorry — your receipt didn't upload. Please try again.");
       setProofPath(null);
       setProofPreview(null);
     } finally {
@@ -257,7 +258,7 @@ export function PaymentStep({
           type="button"
           onClick={handleSubmit}
           disabled={!canSubmit || isPending}
-          className="flex min-h-tap w-full items-center justify-center rounded-lg bg-brand-primary px-6 text-label-base uppercase tracking-label text-text-on-primary transition-fast hover:bg-brand-primary-hover disabled:opacity-50"
+          className="flex h-[52px] w-full items-center justify-center rounded-pill bg-brand-primary px-6 text-label-base uppercase tracking-label text-text-on-primary transition-fast hover:bg-brand-primary-hover active:bg-brand-primary-active disabled:opacity-50"
         >
           {isPending ? "Submitting…" : "Submit payment proof"}
         </button>
@@ -273,14 +274,14 @@ export function PaymentStep({
               <button
                 type="button"
                 onClick={onCancel}
-                className="flex min-h-tap items-center justify-center rounded-lg border border-state-error px-4 text-label-sm uppercase tracking-label text-state-error transition-fast hover:bg-background-card"
+                className="flex min-h-tap items-center justify-center rounded-pill border border-state-error px-4 text-label-sm uppercase tracking-label text-state-error transition-fast hover:bg-background-card"
               >
                 Yes, cancel
               </button>
               <button
                 type="button"
                 onClick={() => setWarn(false)}
-                className="flex min-h-tap items-center justify-center rounded-lg px-4 text-label-sm uppercase tracking-label text-text-secondary transition-fast hover:text-text-heading"
+                className="flex min-h-tap items-center justify-center rounded-pill px-4 text-label-sm uppercase tracking-label text-text-secondary transition-fast hover:text-text-heading"
               >
                 Keep my reservation
               </button>
@@ -290,7 +291,7 @@ export function PaymentStep({
           <button
             type="button"
             onClick={() => setWarn(true)}
-            className="flex min-h-tap w-full items-center justify-center rounded-lg px-6 text-label-base uppercase tracking-label text-text-secondary transition-fast hover:text-text-heading"
+            className="flex min-h-tap w-full items-center justify-center rounded-pill px-6 text-label-base uppercase tracking-label text-text-secondary transition-fast hover:text-text-heading"
           >
             Cancel reservation
           </button>

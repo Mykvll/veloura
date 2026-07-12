@@ -62,7 +62,7 @@ export function LoginForm() {
       <button
         type="submit"
         disabled={pending}
-        className="min-h-tap w-full rounded-sm bg-brand-primary px-6 text-label-base uppercase tracking-label text-text-on-primary transition-fast hover:bg-brand-primary-hover focus-visible:shadow-focus disabled:opacity-60"
+        className="min-h-tap w-full rounded-pill bg-brand-primary px-6 text-label-base uppercase tracking-label text-text-on-primary transition-fast hover:bg-brand-primary-hover active:bg-brand-primary-active focus-visible:shadow-focus disabled:opacity-60"
       >
         {pending ? "Signing in…" : "Sign in"}
       </button>

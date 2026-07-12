@@ -88,7 +88,8 @@ export function AccessoryEditorModal({
         .publicUrl;
       setImageUrl(url);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Photo upload failed.");
+      console.error("Accessory photo upload failed", e);
+      setError("Couldn't upload the photo. Please try again.");
     } finally {
       setUploading(false);
     }

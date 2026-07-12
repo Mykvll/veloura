@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { PaymentMethodEditorModal } from "./payment-method-editor-modal";
 import { deletePaymentMethod } from "@/app/admin/(protected)/payment-actions";
+import { SectionTitle } from "@/components/section-title";
 import type { AdminPaymentMethod } from "./types";
 
 /**
@@ -26,8 +27,10 @@ export function PaymentMethodsManager({
   const [editing, setEditing] = useState<AdminPaymentMethod | "new" | null>(
     null,
   );
-  // Which card is mid-delete-confirm (method id).
+  // Which card is mid-delete-confirm (method id), and which method's QR is
+  // open in the zoom-preview lightbox.
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [preview, setPreview] = useState<AdminPaymentMethod | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -46,17 +49,11 @@ export function PaymentMethodsManager({
 
   return (
     <div>
-      {/* Header — title + count */}
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <div>
-          <h1 className="font-display text-display-lg uppercase tracking-display text-text-accent">
-            Payments
-          </h1>
-          <p className="mt-1 text-body-sm text-text-secondary">
-            The channels customers can pay with. Upload each one&apos;s QR — the
-            customer scans it at the payment step.
-          </p>
-        </div>
+      {/* Centered section title + count badge under it (admin.html). */}
+      <SectionTitle subtitle="The banks & e-wallets customers can pay to — each shows its QR at checkout">
+        Payment Methods
+      </SectionTitle>
+      <div className="mt-3.5 flex justify-center">
         <span className="rounded-pill border border-border-strong px-3 py-1 text-label-sm uppercase tracking-label text-text-secondary">
           {methods.length} {methods.length === 1 ? "type" : "types"}
         </span>
@@ -73,15 +70,22 @@ export function PaymentMethodsManager({
             key={m.id}
             className="flex flex-col gap-3 rounded-lg border border-border-soft bg-background-card p-4 shadow-card"
           >
-            {/* Top row: QR thumbnail + name/status */}
+            {/* Top row: QR thumbnail (tap to zoom) + name/status */}
             <div className="flex items-start gap-3">
               {m.qrUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={m.qrUrl}
-                  alt={`${m.name} QR code`}
-                  className="h-16 w-16 flex-none rounded-sm border border-border-soft bg-white object-contain"
-                />
+                <button
+                  type="button"
+                  onClick={() => setPreview(m)}
+                  aria-label={`View ${m.name} QR code full size`}
+                  className="flex-none cursor-zoom-in rounded-sm focus-visible:shadow-focus"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={m.qrUrl}
+                    alt={`${m.name} QR code`}
+                    className="h-16 w-16 rounded-sm border border-border-soft bg-white object-contain"
+                  />
+                </button>
               ) : (
                 <span className="flex h-16 w-16 flex-none items-center justify-center rounded-sm border border-border-soft bg-background-panel text-center text-label-sm uppercase tracking-label text-text-secondary">
                   No QR
@@ -108,14 +112,14 @@ export function PaymentMethodsManager({
               {confirmId === m.id ? (
                 <>
                   <span className="w-full text-body-sm text-text-primary">
-                    Remove <b>{m.name}</b>? Customers won&apos;t be able to pay
-                    with it.
+                    Remove <b>{m.name}</b>? Customers will no longer be able to
+                    pay with this method.
                   </span>
                   <button
                     type="button"
                     onClick={() => handleDelete(m.id)}
                     disabled={isPending}
-                    className="rounded-pill bg-state-error px-4 py-1.5 text-label-sm uppercase tracking-label text-text-on-primary transition-colors disabled:opacity-60"
+                    className="rounded-pill bg-state-error inline-flex min-h-tap items-center justify-center px-4 text-label-sm uppercase tracking-label text-text-on-primary transition-colors disabled:opacity-60"
                   >
                     {isPending ? "Removing…" : "Yes, remove"}
                   </button>
@@ -123,7 +127,7 @@ export function PaymentMethodsManager({
                     type="button"
                     onClick={() => setConfirmId(null)}
                     disabled={isPending}
-                    className="rounded-pill border border-border-strong px-4 py-1.5 text-label-sm uppercase tracking-label text-text-secondary transition-colors hover:bg-background-panel disabled:opacity-60"
+                    className="rounded-pill border border-border-strong inline-flex min-h-tap items-center justify-center px-4 text-label-sm uppercase tracking-label text-text-secondary transition-colors hover:bg-background-panel disabled:opacity-60"
                   >
                     Keep
                   </button>
@@ -133,7 +137,7 @@ export function PaymentMethodsManager({
                   <button
                     type="button"
                     onClick={() => setEditing(m)}
-                    className="rounded-pill border border-border-strong px-4 py-1.5 text-label-sm uppercase tracking-label text-text-primary transition-colors hover:bg-background-panel"
+                    className="rounded-pill border border-border-strong inline-flex min-h-tap items-center justify-center px-4 text-label-sm uppercase tracking-label text-text-primary transition-colors hover:bg-background-panel"
                   >
                     Edit
                   </button>
@@ -143,7 +147,7 @@ export function PaymentMethodsManager({
                       setError(null);
                       setConfirmId(m.id);
                     }}
-                    className="rounded-pill px-4 py-1.5 text-label-sm uppercase tracking-label text-state-error transition-colors hover:bg-background-panel"
+                    className="rounded-pill inline-flex min-h-tap items-center justify-center px-4 text-label-sm uppercase tracking-label text-state-error transition-colors hover:bg-background-panel"
                   >
                     Remove
                   </button>
@@ -167,6 +171,26 @@ export function PaymentMethodsManager({
           </span>
         </button>
       </div>
+
+      {/* QR zoom-preview lightbox — tap outside to close (admin.html). */}
+      {preview?.qrUrl ? (
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setPreview(null);
+          }}
+          className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-3.5 bg-overlay-scrim-heavy p-6"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={preview.qrUrl}
+            alt={`${preview.name} QR code`}
+            className="max-h-[70vh] max-w-[90%] rounded-md bg-white shadow-float"
+          />
+          <div className="text-label-sm uppercase tracking-label text-text-on-primary">
+            {preview.name} · tap outside to close
+          </div>
+        </div>
+      ) : null}
 
       {/* Editor modal — fresh instance per method / for "new". */}
       {editing ? (
