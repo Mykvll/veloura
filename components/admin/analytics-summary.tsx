@@ -68,7 +68,8 @@ function StatCard({
  * The Analytics SECTION at the top of the admin page (server component).
  *
  * Pure display: every number is computed on the server in the admin page from
- * VERIFIED bookings only (business rule 3) and passed in via `data`. Because the
+ * VERIFIED bookings (business rule 3) plus manually logged pre-system rentals
+ * (the Rental History section) and passed in via `data`. Because the
  * admin page is force-dynamic and every mutation calls router.refresh(), these
  * cards recompute whenever bookings change — no client state here.
  *
@@ -82,7 +83,7 @@ export function AnalyticsSummary({ data }: { data: AnalyticsData }) {
   return (
     <div>
       {/* Centered gold section title with sparkles, like every admin section. */}
-      <SectionTitle subtitle="Verified rentals only — updates as you verify or delete bookings">
+      <SectionTitle subtitle="Verified rentals + logged history — updates as you verify, delete, or log">
         Analytics
       </SectionTitle>
 
@@ -94,7 +95,7 @@ export function AnalyticsSummary({ data }: { data: AnalyticsData }) {
           value={peso(data.totalEarned)}
           sub={`Rentals ${peso(data.rentalRevenue)} · add-ons ${peso(
             data.accessoryRevenue,
-          )}`}
+          )} · logged ${peso(data.loggedRevenue)}`}
         />
         <StatCard
           icon={ShoppingCart}
@@ -129,7 +130,7 @@ export function AnalyticsSummary({ data }: { data: AnalyticsData }) {
           sub={
             data.topDress
               ? `${data.topDressCount} rental${data.topDressCount > 1 ? "s" : ""}`
-              : "No verified rentals yet"
+              : "No rentals yet"
           }
         />
         <StatCard
@@ -148,7 +149,7 @@ export function AnalyticsSummary({ data }: { data: AnalyticsData }) {
           icon={Wallet}
           label="Avg. per rental"
           value={data.avgPerRental != null ? peso(data.avgPerRental) : "—"}
-          sub="Rental + add-ons"
+          sub="Across verified + logged"
         />
       </div>
     </div>

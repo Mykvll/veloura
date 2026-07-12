@@ -4,12 +4,14 @@ import { DressManager } from "@/components/admin/dress-manager";
 import { AccessoriesManager } from "@/components/admin/accessories-manager";
 import { PaymentMethodsManager } from "@/components/admin/payment-methods-manager";
 import { BookingsManager } from "@/components/admin/bookings-manager";
+import { HistoryManager } from "@/components/admin/history-manager";
 import { BookingCalendar } from "@/components/admin/booking-calendar";
 import type {
   AdminDress,
   AdminAccessory,
   AdminPaymentMethod,
   AdminBooking,
+  AdminPastRental,
   AnalyticsData,
   CalendarRental,
   CalendarFitting,
@@ -55,19 +57,32 @@ export default async function AdminDashboardPage() {
     .select("id, dress_id, dress_name, amount")
     .eq("payment_status", "verified");
 
+  // Manually logged pre-system rentals (the Rental History section). They
+  // count toward earnings and wear-counts exactly like verified bookings, but
+  // they skip verification and never touch availability. Newest first.
+  const { data: pastRentals } = await supabase
+    .from("rental_history")
+    .select("id, dress_id, dress_name, renter_name, start_date, end_date, amount_paid")
+    .order("start_date", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  // Wear-counts: verified bookings + logged history both count as a "wear",
+  // so the "Rented N×" badge and "Most rented" reflect the dress's whole life.
   const rentedByDress = new Map<string, number>();
   const rentalCountByName = new Map<string, number>();
-  for (const b of verified ?? []) {
-    if (b.dress_id) {
-      rentedByDress.set(b.dress_id, (rentedByDress.get(b.dress_id) ?? 0) + 1);
+  const countWear = (dressId: string | null, dressName: string | null) => {
+    if (dressId) {
+      rentedByDress.set(dressId, (rentedByDress.get(dressId) ?? 0) + 1);
     }
-    if (b.dress_name) {
+    if (dressName) {
       rentalCountByName.set(
-        b.dress_name,
-        (rentalCountByName.get(b.dress_name) ?? 0) + 1,
+        dressName,
+        (rentalCountByName.get(dressName) ?? 0) + 1,
       );
     }
-  }
+  };
+  for (const b of verified ?? []) countWear(b.dress_id, b.dress_name);
+  for (const h of pastRentals ?? []) countWear(h.dress_id, h.dress_name);
 
   // Accessory add-on revenue for those verified bookings. Each add-on's price is
   // snapshotted on booking_accessories.price_at_booking, so this is immune to
@@ -213,19 +228,31 @@ export default async function AdminDashboardPage() {
     }),
   );
 
-  // ---- Analytics (VERIFIED only) --------------------------------------------
+  // ---- Analytics (verified bookings + logged history) -----------------------
   // Computed here so it recomputes on every load; the page is force-dynamic and
   // every admin mutation calls router.refresh(), so the cards always reflect the
   // current bookings. Money is in whole pesos.
-  const totalEarned = (verified ?? []).reduce((s, b) => s + (b.amount ?? 0), 0);
-  const rentalRevenue = totalEarned - accessoryRevenue;
+  //
+  // Total earned = verified booking revenue (rental fee + add-ons) PLUS what
+  // logged pre-system rentals brought in — the business earned before this app
+  // existed, and history entries count as earned immediately (no verification).
+  const verifiedEarned = (verified ?? []).reduce(
+    (s, b) => s + (b.amount ?? 0),
+    0,
+  );
+  const loggedRevenue = (pastRentals ?? []).reduce(
+    (s, h) => s + h.amount_paid,
+    0,
+  );
+  const totalEarned = verifiedEarned + loggedRevenue;
+  const rentalRevenue = verifiedEarned - accessoryRevenue;
 
   // Inventory spend: what the shop paid to own the catalogue on hand.
   const dressSpend = rows.reduce((s, d) => s + d.cost, 0);
   const accessorySpend = accessoryRows.reduce((s, a) => s + a.cost * a.stock, 0);
   const totalSpend = dressSpend + accessorySpend;
 
-  // Most-rented dress (verified only), by snapshotted name.
+  // Most-rented dress (verified + logged), by snapshotted name.
   let topDress = "";
   let topDressCount = 0;
   for (const [name, count] of rentalCountByName) {
@@ -258,10 +285,14 @@ export default async function AdminDashboardPage() {
   }));
 
   const verifiedCount = verified?.length ?? 0;
+  const loggedCount = pastRentals?.length ?? 0;
+  // "Per rental" = every rental that earned money: verified + logged.
+  const rentalsCounted = verifiedCount + loggedCount;
   const analytics: AnalyticsData = {
     totalEarned,
     rentalRevenue,
     accessoryRevenue,
+    loggedRevenue,
     totalSpend,
     dressSpend,
     accessorySpend,
@@ -269,14 +300,33 @@ export default async function AdminDashboardPage() {
     verifiedCount,
     // Rentals still awaiting review (from the rows we already fetched).
     pending: bookingRows.filter((b) => b.status === "pending").length,
+    loggedCount,
     topDress,
     topDressCount,
     dressesLive: rows.filter((d) => d.status === "live").length,
     accessoriesCount: accessoryRows.length,
     outStock: accessoryRows.filter((a) => a.stock <= 0).length,
     lowStock: accessoryRows.filter((a) => a.stock > 0 && a.stock <= 2).length,
-    avgPerRental: verifiedCount ? Math.round(totalEarned / verifiedCount) : null,
+    avgPerRental: rentalsCounted
+      ? Math.round(totalEarned / rentalsCounted)
+      : null,
   };
+
+  // Shape history rows for the Rental History section, and the slim dress
+  // list its "Log past rental" modal picks from (price pre-fills the amount).
+  const historyRows: AdminPastRental[] = (pastRentals ?? []).map((h) => ({
+    id: h.id,
+    renter: h.renter_name,
+    dress: h.dress_name,
+    start: h.start_date,
+    end: h.end_date,
+    amount: h.amount_paid,
+  }));
+  const historyDressOptions = rows.map((d) => ({
+    id: d.id,
+    name: d.name,
+    price: d.price,
+  }));
 
   // Stacked sections on one page. The anchor ids (#analytics, #dresses, …) are
   // what the top nav scrolls to; scroll-mt keeps a section's heading clear of
@@ -324,6 +374,10 @@ export default async function AdminDashboardPage() {
 
       <section id="bookings" className="scroll-mt-24">
         <BookingsManager bookings={bookingRows} />
+      </section>
+
+      <section id="history" className="scroll-mt-24">
+        <HistoryManager entries={historyRows} dresses={historyDressOptions} />
       </section>
 
       <section id="calendar" className="scroll-mt-24">

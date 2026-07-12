@@ -18,7 +18,8 @@ export type AdminDress = {
     length: number | null;
   }[];
   reviews: { name: string; body: string; photoUrl: string | null }[];
-  /** How many verified rentals this dress has had (for the "Rented N×" badge). */
+  /** How many rentals this dress has had — verified bookings + manually
+   *  logged past rentals (for the "Rented N×" badge). */
   rentedCount: number;
 };
 
@@ -74,12 +75,31 @@ export type AdminBooking = {
 };
 
 /**
+ * A pre-system rental as the admin Rental History section works with it. Maps
+ * to a `rental_history` row (dress name is the snapshot taken when logged).
+ * These exist only for lifetime earnings + wear counts — they skip payment
+ * verification and never block calendar dates.
+ */
+export type AdminPastRental = {
+  id: string;
+  renter: string;
+  dress: string;
+  /** Rental dates, ISO "YYYY-MM-DD" (always in the past). */
+  start: string;
+  end: string;
+  /** What they actually paid (rental + any add-ons), whole pesos. */
+  amount: number;
+};
+
+/**
  * The numbers the Analytics section shows, all computed on the server from
- * VERIFIED bookings only (business rule 3). Money is in whole pesos.
+ * VERIFIED bookings (business rule 3) plus manually LOGGED pre-system rentals
+ * (rental_history). Money is in whole pesos.
  *
  * Revenue is broken out: `totalEarned` = what verified renters actually paid
- * (the booking `amount`), split into `rentalRevenue` (the dress fee) and
- * `accessoryRevenue` (add-ons, summed from booking_accessories). Spend is what
+ * (the booking `amount`) + `loggedRevenue`, split into `rentalRevenue` (the
+ * dress fee), `accessoryRevenue` (add-ons, summed from booking_accessories),
+ * and `loggedRevenue` (Σ amount_paid from rental_history). Spend is what
  * the shop paid to own the inventory: `dressSpend` (Σ dress cost) +
  * `accessorySpend` (Σ unit cost × stock on hand). `net` = earned − spend.
  */
@@ -87,6 +107,8 @@ export type AnalyticsData = {
   totalEarned: number;
   rentalRevenue: number;
   accessoryRevenue: number;
+  /** Earnings from manually logged pre-system rentals. */
+  loggedRevenue: number;
   totalSpend: number;
   dressSpend: number;
   accessorySpend: number;
@@ -94,7 +116,9 @@ export type AnalyticsData = {
   /** How many verified rentals, and how many rentals still awaiting review. */
   verifiedCount: number;
   pending: number;
-  /** Most-rented dress by name (verified only), and its rental count. */
+  /** How many pre-system rentals were logged manually. */
+  loggedCount: number;
+  /** Most-rented dress by name (verified + logged), and its rental count. */
   topDress: string;
   topDressCount: number;
   /** Live dresses in the catalogue. */
@@ -103,7 +127,7 @@ export type AnalyticsData = {
   accessoriesCount: number;
   outStock: number;
   lowStock: number;
-  /** Average earned per verified rental, or null when there are none yet. */
+  /** Average earned per rental (verified + logged), or null when none yet. */
   avgPerRental: number | null;
 };
 
