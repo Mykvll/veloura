@@ -1,5 +1,10 @@
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { CollectionGallery } from "@/components/collection-gallery";
+import { SiteHeader } from "@/components/site-header";
+import { SiteFooter } from "@/components/site-footer";
+import { SectionTitle } from "@/components/section-title";
+import { FaqSection } from "@/components/faq-section";
 import type { DressDetail } from "@/components/dress-detail-modal";
 import type { CustomerAccessory } from "@/components/accessory-picker";
 import type { PaymentOption } from "@/components/reserve/payment-step";
@@ -8,6 +13,41 @@ import type { BlockedDate } from "@/components/availability-calendar";
 // Always fetch fresh from Supabase on each request (no static caching), so new
 // dresses show up as soon as they're added.
 export const dynamic = "force-dynamic";
+
+/**
+ * The hero at the top of the one-pager (design/index.html → <Hero />): round
+ * logo, the gold display-serif tagline, the uppercase occasions line, and a
+ * gold pill CTA that smooth-scrolls to #collection (html has `scroll-smooth`).
+ * All static, so it lives right here in the server page.
+ */
+function Hero() {
+  return (
+    <section className="flex flex-col items-center gap-3.5 px-6 pb-10 pt-14 text-center">
+      <Image
+        src="/veloura-logo.png"
+        alt="Veloura by CM"
+        width={110}
+        height={110}
+        className="h-[110px] w-[110px] rounded-full shadow-card"
+        priority
+      />
+      <h1 className="font-display text-display-lg uppercase tracking-display text-text-accent">
+        Wear luxury,
+        <br />
+        not the price.
+      </h1>
+      <p className="text-label-base uppercase tracking-label text-text-secondary">
+        Graduation · Weddings · Formal Events · Date Nights
+      </p>
+      <a
+        href="#collection"
+        className="mt-1 inline-flex h-[52px] items-center justify-center rounded-pill bg-brand-primary px-[34px] text-label-base uppercase tracking-label text-text-on-primary transition-colors duration-fast ease-soft hover:bg-brand-primary-hover active:bg-brand-primary-active"
+      >
+        Browse the collection
+      </a>
+    </section>
+  );
+}
 
 export default async function Home() {
   const supabase = await createClient();
@@ -93,11 +133,16 @@ export default async function Home() {
   if (error) {
     // Surface the failure instead of rendering a silently-empty grid.
     return (
-      <main className="mx-auto w-full max-w-page-max px-6 py-12">
-        <p className="text-body-base text-state-error">
-          Sorry — we couldn&apos;t load the collection right now. Please try again.
-        </p>
-      </main>
+      <>
+        <SiteHeader />
+        <main className="mx-auto w-full max-w-page-max flex-1 px-6 py-12">
+          <p className="text-body-base text-state-error">
+            Sorry — we couldn&apos;t load the collection right now. Please try
+            again.
+          </p>
+        </main>
+        <SiteFooter />
+      </>
     );
   }
 
@@ -132,24 +177,47 @@ export default async function Home() {
     };
   });
 
+  // The one-pager, in the prototype's stacked order:
+  // NavBar → Hero → Our Collection → FAQ → footer. The dress detail / reserve /
+  // payment flow is a modal wizard opened from a DressCard — never a route.
   return (
-    <main className="mx-auto w-full max-w-page-max px-6 py-12">
-      <h1 className="font-display text-display-lg uppercase tracking-display text-text-accent">
-        Our Collection
-      </h1>
+    <div id="top">
+      <SiteHeader />
 
-      {cards.length === 0 ? (
-        // Empty state — no dresses yet.
-        <p className="mt-8 text-body-base text-text-secondary">No dresses yet</p>
-      ) : (
-        <CollectionGallery
-          dresses={cards}
-          accessories={accessories}
-          paymentMethods={paymentMethods}
-          blockedDates={blockedDates}
-          fittingsBooked={fittingsBooked}
-        />
-      )}
-    </main>
+      <Hero />
+
+      <main
+        id="collection"
+        className="mx-auto w-full max-w-page-max scroll-mt-24 px-6 pb-12 pt-2"
+      >
+        <SectionTitle subtitle="Only the sizes indicated are available">
+          Our Collection
+        </SectionTitle>
+
+        {cards.length === 0 ? (
+          // Empty state — no dresses in the catalogue yet.
+          <div className="mt-8 rounded-lg border border-dashed border-border-strong bg-background-card p-10 text-center">
+            <p className="text-body-lg text-text-primary">
+              Our collection is being prepared.
+            </p>
+            <p className="mt-1 text-body-sm text-text-secondary">
+              Please check back soon — new dresses are on their way.
+            </p>
+          </div>
+        ) : (
+          <CollectionGallery
+            dresses={cards}
+            accessories={accessories}
+            paymentMethods={paymentMethods}
+            blockedDates={blockedDates}
+            fittingsBooked={fittingsBooked}
+          />
+        )}
+      </main>
+
+      <FaqSection />
+
+      <SiteFooter />
+    </div>
   );
 }

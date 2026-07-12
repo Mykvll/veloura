@@ -104,10 +104,12 @@ export function DressDetailsPanel({
         <SpecRow label="Length" cm={selected.length_cm} />
       </div>
 
-      {/* Fees. These are fixed business rules from the design, not per-dress data. */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-md bg-background-panel p-4">
-          <div className="mb-1 text-label-sm uppercase tracking-label text-text-secondary">
+      {/* Fees — two InfoBox-style cream cards (design InfoBox: card fill, soft
+          border + shadow, uppercase brown label, gold price). Fixed business
+          rules from the design, not per-dress data. */}
+      <div className="grid grid-cols-2 gap-2.5">
+        <div className="rounded-md border border-border-soft bg-background-card p-4 shadow-card">
+          <div className="mb-1.5 text-label-base uppercase tracking-[0.12em] text-text-heading">
             Rental fee
           </div>
           <div className="text-price-base text-text-accent">
@@ -116,8 +118,8 @@ export function DressDetailsPanel({
           </div>
           <div className="mt-1 text-body-sm text-text-secondary">+ ₱300 per day</div>
         </div>
-        <div className="rounded-md bg-background-panel p-4">
-          <div className="mb-1 text-label-sm uppercase tracking-label text-text-secondary">
+        <div className="rounded-md border border-border-soft bg-background-card p-4 shadow-card">
+          <div className="mb-1.5 text-label-base uppercase tracking-[0.12em] text-text-heading">
             Deposit
           </div>
           <div className="text-price-base text-text-accent">
@@ -138,14 +140,15 @@ export function DressDetailsPanel({
       <button
         type="button"
         onClick={onReserve}
-        className="flex min-h-tap w-full items-center justify-center rounded-lg bg-brand-primary px-6 text-label-base uppercase tracking-label text-text-on-primary transition-fast hover:bg-brand-primary-hover"
+        className="flex h-[52px] w-full items-center justify-center rounded-pill bg-brand-primary px-6 text-label-base uppercase tracking-label text-text-on-primary transition-fast hover:bg-brand-primary-hover active:bg-brand-primary-active"
       >
         Reserve this dress
       </button>
+      {/* Secondary pill = 1px gold outline on cream with gold text. */}
       <button
         type="button"
         onClick={onFitting}
-        className="flex min-h-tap w-full items-center justify-center rounded-lg border border-border-strong bg-background-card px-6 text-label-base uppercase tracking-label text-text-primary transition-fast hover:border-border-accent"
+        className="flex min-h-tap w-full items-center justify-center rounded-pill border border-border-accent bg-background-card px-6 text-label-base uppercase tracking-label text-text-accent transition-fast hover:bg-background-panel"
       >
         Book a fitting
       </button>

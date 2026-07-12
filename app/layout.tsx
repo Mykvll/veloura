@@ -43,7 +43,9 @@ export default function RootLayout({
       // Expose each font as a CSS variable; the brand color/body font are
       // applied in globals.css so every page inherits them.
       className={cn(
-        "h-full antialiased",
+        // scroll-smooth: the one-pager's nav + hero CTA are plain #anchors;
+        // this gives them the prototype's smooth scrolling with no client JS.
+        "h-full scroll-smooth antialiased",
         display.variable,
         body.variable,
         script.variable,

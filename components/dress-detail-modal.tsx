@@ -13,7 +13,7 @@ import {
 import { RentForm, type RentContinueData } from "./reserve/rent-form";
 import { FittingForm } from "./reserve/fitting-form";
 import { PaymentStep, type PaymentOption } from "./reserve/payment-step";
-import { niceDate } from "@/lib/reserve";
+import { niceDate, FITTING_LOCATION } from "@/lib/reserve";
 
 /** One renter review, already shaped for display. */
 export type DressReview = {
@@ -87,6 +87,13 @@ export function DressDetailModal({
   // payment" is pressed.
   const [payment, setPayment] = useState<RentContinueData | null>(null);
 
+  // The renter photo open in the lightbox (null = closed). All review photos
+  // show as thumbnails inside it, like the prototype's "Photos from renters".
+  const [reviewPhoto, setReviewPhoto] = useState<string | null>(null);
+  const reviewPhotos = dress.reviews
+    .map((r) => r.photoUrl)
+    .filter((u): u is string => !!u);
+
   // Open the calendar in the requested mode, clearing any earlier pick.
   const goToDate = (m: "rent" | "fitting") => {
     setMode(m);
@@ -124,22 +131,23 @@ export function DressDetailModal({
           // corners. Desktop (md+): a centered card, up to 920px wide.
           className="fixed inset-x-0 bottom-0 z-50 flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-lg border border-border-soft bg-background-card shadow-float md:inset-auto md:left-1/2 md:top-1/2 md:bottom-auto md:w-[min(920px,94vw)] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-lg"
         >
-          {/* Header — dress name (gold display serif) + style name */}
-          <div className="flex items-start justify-between gap-4 border-b border-border-soft px-6 py-4">
-            <div>
-              <Dialog.Title className="font-display text-display-md uppercase tracking-display text-text-accent">
-                {dress.name}
-              </Dialog.Title>
-              {subtitle ? (
-                <p className="text-body-sm text-text-secondary">{subtitle}</p>
-              ) : null}
-            </div>
+          {/* Header — centered dress name (gold display serif) + uppercase
+              style/step line, round ✕ in the corner, like the prototype Modal. */}
+          <div className="relative border-b border-border-soft px-14 py-4 text-center">
+            <Dialog.Title className="font-display text-display-md uppercase tracking-display text-text-accent md:text-display-lg">
+              {dress.name}
+            </Dialog.Title>
+            {subtitle ? (
+              <p className="mt-1.5 text-label-base uppercase tracking-label text-text-secondary">
+                {subtitle}
+              </p>
+            ) : null}
             {/* No close ✕ on the payment step — Cancel (with a warning) is the
                 only way out. */}
             {locked ? null : (
               <Dialog.Close
                 aria-label="Close"
-                className="min-h-tap min-w-tap rounded-sm text-2xl leading-none text-text-secondary hover:text-text-heading focus-visible:shadow-focus"
+                className="absolute right-3.5 top-3.5 flex h-9 w-9 items-center justify-center rounded-full border border-border-soft bg-white text-base leading-none text-text-primary hover:text-text-heading focus-visible:shadow-focus"
               >
                 ✕
               </Dialog.Close>
@@ -160,7 +168,8 @@ export function DressDetailModal({
                 <p className="text-body-base text-text-primary">
                   {mode === "fitting" ? (
                     <>
-                      <b>{dress.name}</b> fitting on <b>{date && niceDate(date)}</b>.
+                      <b>{dress.name}</b> fitting on <b>{date && niceDate(date)}</b>{" "}
+                      at {FITTING_LOCATION}.
                     </>
                   ) : (
                     <>
@@ -173,10 +182,14 @@ export function DressDetailModal({
                   Our team will confirm and send you a text once verified. Your
                   date is held in the meantime.
                 </p>
+                {/* Closing courtesy line — gold, single ♥ (the brand's ceiling). */}
+                <p className="text-body-sm text-text-accent">
+                  Thank you for choosing Veloura by CM ♥
+                </p>
                 <button
                   type="button"
                   onClick={onClose}
-                  className="mt-2 flex min-h-tap items-center justify-center rounded-lg bg-brand-primary px-6 text-label-base uppercase tracking-label text-text-on-primary transition-fast hover:bg-brand-primary-hover"
+                  className="mt-2 flex min-h-tap items-center justify-center rounded-pill bg-brand-primary px-[26px] text-label-base uppercase tracking-label text-text-on-primary transition-fast hover:bg-brand-primary-hover active:bg-brand-primary-active"
                 >
                   Back to the collection
                 </button>
@@ -240,64 +253,107 @@ export function DressDetailModal({
                 </div>
               </div>
             ) : (
-              <>
-                {/* Two columns on desktop, stacked on mobile. */}
-                <div className="grid grid-cols-1 gap-10 md:grid-cols-2">
-                  {/* Left: photo slideshow */}
+              /* Two columns on desktop, stacked on mobile. Left: slideshow +
+                 renter reviews under it (prototype DetailsLeft); right: sizes,
+                 measurements, fees, reserve (DetailsRight). */
+              <div className="grid grid-cols-1 gap-10 md:grid-cols-2">
+                <div className="flex flex-col gap-3">
                   <DressGallery photos={dress.photos} dressName={dress.name} />
 
-                  {/* Right: sizes, measurements, fees, reserve */}
-                  {dress.sizes.length > 0 ? (
-                    <DressDetailsPanel
-                      sizes={dress.sizes}
-                      price={dress.price}
-                      onReserve={() => goToDate("rent")}
-                      onFitting={() => goToDate("fitting")}
-                    />
-                  ) : (
-                    <p className="text-body-base text-text-secondary">
-                      Sizing details coming soon.
-                    </p>
-                  )}
+                  {/* Renter reviews — panel per review, photo taps open the
+                      renter-photo lightbox. */}
+                  {dress.reviews.map((r) => (
+                    <article
+                      key={r.id}
+                      className="flex items-start gap-3 rounded-md bg-background-panel p-3.5"
+                    >
+                      {r.photoUrl ? (
+                        <button
+                          type="button"
+                          onClick={() => setReviewPhoto(r.photoUrl)}
+                          aria-label={`View photo from ${r.name}`}
+                          className="flex-none cursor-zoom-in"
+                        >
+                          <Image
+                            src={r.photoUrl}
+                            alt={`Photo from ${r.name}`}
+                            width={48}
+                            height={48}
+                            className="h-12 w-12 rounded-sm border border-border-accent object-cover object-top"
+                          />
+                        </button>
+                      ) : null}
+                      <div>
+                        <div className="mb-1.5 text-label-sm uppercase tracking-label text-text-accent">
+                          Renter review — {r.name}
+                        </div>
+                        <p className="text-body-sm text-text-primary">
+                          {r.body}
+                        </p>
+                      </div>
+                    </article>
+                  ))}
                 </div>
 
-                {/* Reviews, full width below the two columns. */}
-                {dress.reviews.length > 0 ? (
-                  <section className="mt-14">
-                    <h2 className="font-display text-display-md uppercase tracking-display text-text-accent">
-                      Renter reviews
-                    </h2>
-                    <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-                      {dress.reviews.map((r) => (
-                        <article
-                          key={r.id}
-                          className="flex items-start gap-3 rounded-md bg-background-panel p-4"
-                        >
-                          {r.photoUrl ? (
-                            <Image
-                              src={r.photoUrl}
-                              alt={`Photo from ${r.name}`}
-                              width={48}
-                              height={48}
-                              className="h-12 w-12 flex-none rounded-sm border border-border-accent object-cover object-top"
-                            />
-                          ) : null}
-                          <div>
-                            <div className="mb-1.5 text-label-sm uppercase tracking-label text-text-accent">
-                              {r.name}
-                            </div>
-                            <p className="text-body-sm text-text-primary">
-                              {r.body}
-                            </p>
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                  </section>
-                ) : null}
-              </>
+                {dress.sizes.length > 0 ? (
+                  <DressDetailsPanel
+                    sizes={dress.sizes}
+                    price={dress.price}
+                    onReserve={() => goToDate("rent")}
+                    onFitting={() => goToDate("fitting")}
+                  />
+                ) : (
+                  <p className="text-body-base text-text-secondary">
+                    Sizing details coming soon.
+                  </p>
+                )}
+              </div>
             )}
           </div>
+
+          {/* Renter-photo lightbox — heavy scrim, the tapped photo big, every
+              renter photo as a thumbnail (prototype's "Photos from renters"). */}
+          {reviewPhoto ? (
+            <div
+              onClick={(e) => {
+                if (e.target === e.currentTarget) setReviewPhoto(null);
+              }}
+              className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-3.5 bg-overlay-scrim-heavy p-6"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={reviewPhoto}
+                alt="Renter photo preview"
+                className="max-h-[70vh] max-w-[90%] rounded-md shadow-float"
+              />
+              {reviewPhotos.length > 1 ? (
+                <div className="flex gap-2.5">
+                  {reviewPhotos.map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setReviewPhoto(p)}
+                      className={`overflow-hidden rounded-sm border-2 ${
+                        p === reviewPhoto
+                          ? "border-brand-primary-soft"
+                          : "border-transparent"
+                      }`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={p}
+                        alt="Renter photo"
+                        className="h-14 w-14 object-cover object-top"
+                      />
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              <div className="text-label-sm uppercase tracking-label text-text-on-primary">
+                Photos from renters — tap outside to close
+              </div>
+            </div>
+          ) : null}
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

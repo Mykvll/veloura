@@ -9,6 +9,7 @@ import {
   flagBookingInvalid,
   deleteBooking,
 } from "@/app/admin/(protected)/booking-actions";
+import { SectionTitle } from "@/components/section-title";
 import type { AdminBooking } from "./types";
 
 /**
@@ -81,16 +82,10 @@ export function BookingsManager({ bookings }: { bookings: AdminBooking[] }) {
 
   return (
     <div>
-      {/* Header — matches the other admin sections. */}
-      <div>
-        <h1 className="font-display text-display-lg uppercase tracking-display text-text-accent">
-          Bookings &amp; Payments
-        </h1>
-        <p className="mt-1 text-body-sm text-text-secondary">
-          Verify payment proofs — remove bookings with fake, wrong or missing
-          payments.
-        </p>
-      </div>
+      {/* Centered gold section title, like every admin section. */}
+      <SectionTitle subtitle="Verify payment proofs — remove bookings with fake, wrong or missing payments">
+        Bookings &amp; Payments
+      </SectionTitle>
 
       {error ? (
         <p className="mt-4 text-body-sm text-state-error">{error}</p>
@@ -156,7 +151,7 @@ export function BookingsManager({ bookings }: { bookings: AdminBooking[] }) {
                       type="button"
                       onClick={() => run(b.id, verifyBooking)}
                       disabled={busy}
-                      className="min-h-9 rounded-pill bg-state-success px-3.5 text-label-sm uppercase tracking-wide text-text-on-primary transition-colors disabled:opacity-60"
+                      className="inline-flex min-h-tap items-center justify-center rounded-pill bg-state-success px-3.5 text-label-sm uppercase tracking-wide text-text-on-primary transition-colors disabled:opacity-60"
                     >
                       {busy ? "Working…" : "Verify"}
                     </button>
@@ -167,7 +162,7 @@ export function BookingsManager({ bookings }: { bookings: AdminBooking[] }) {
                       type="button"
                       onClick={() => run(b.id, flagBookingInvalid)}
                       disabled={busy}
-                      className="min-h-9 rounded-pill border border-state-error bg-white px-3.5 text-label-sm uppercase tracking-wide text-state-error transition-colors hover:bg-background-panel disabled:opacity-60"
+                      className="inline-flex min-h-tap items-center justify-center rounded-pill border border-state-error bg-white px-3.5 text-label-sm uppercase tracking-wide text-state-error transition-colors hover:bg-background-panel disabled:opacity-60"
                     >
                       Mark invalid
                     </button>
@@ -180,7 +175,7 @@ export function BookingsManager({ bookings }: { bookings: AdminBooking[] }) {
                         type="button"
                         onClick={() => run(b.id, deleteBooking)}
                         disabled={busy}
-                        className="min-h-9 rounded-pill bg-state-error px-3.5 text-label-sm uppercase tracking-wide text-text-on-primary transition-colors disabled:opacity-60"
+                        className="inline-flex min-h-tap items-center justify-center rounded-pill bg-state-error px-3.5 text-label-sm uppercase tracking-wide text-text-on-primary transition-colors disabled:opacity-60"
                       >
                         {busy ? "Deleting…" : "Yes, delete"}
                       </button>
@@ -188,7 +183,7 @@ export function BookingsManager({ bookings }: { bookings: AdminBooking[] }) {
                         type="button"
                         onClick={() => setConfirmId(null)}
                         disabled={busy}
-                        className="min-h-9 rounded-pill border border-border-soft bg-white px-3.5 text-label-sm uppercase tracking-wide text-text-primary transition-colors hover:bg-background-panel disabled:opacity-60"
+                        className="inline-flex min-h-tap items-center justify-center rounded-pill border border-border-soft bg-white px-3.5 text-label-sm uppercase tracking-wide text-text-primary transition-colors hover:bg-background-panel disabled:opacity-60"
                       >
                         Keep
                       </button>
@@ -200,7 +195,7 @@ export function BookingsManager({ bookings }: { bookings: AdminBooking[] }) {
                         setError(null);
                         setConfirmId(b.id);
                       }}
-                      className="min-h-9 rounded-pill border border-border-soft bg-white px-3.5 text-label-sm uppercase tracking-wide text-state-error transition-colors hover:bg-background-panel"
+                      className="inline-flex min-h-tap items-center justify-center rounded-pill border border-border-soft bg-white px-3.5 text-label-sm uppercase tracking-wide text-state-error transition-colors hover:bg-background-panel"
                     >
                       Delete booking
                     </button>

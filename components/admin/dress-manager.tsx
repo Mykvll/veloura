@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { DressEditorModal } from "./dress-editor-modal";
+import { SectionTitle } from "@/components/section-title";
 import type { AdminDress } from "./types";
 
 /**
@@ -20,16 +21,11 @@ export function DressManager({ dresses }: { dresses: AdminDress[] }) {
 
   return (
     <div>
-      {/* Header — title + catalogue count */}
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <div>
-          <h1 className="font-display text-display-lg uppercase tracking-display text-text-accent">
-            Manage Collection
-          </h1>
-          <p className="mt-1 text-body-sm text-text-secondary">
-            Tap a dress to edit its photos, sizes &amp; reviews.
-          </p>
-        </div>
+      {/* Centered section title + catalogue-count badge under it (admin.html). */}
+      <SectionTitle subtitle="Tap a dress to edit its photos, sizes & reviews">
+        Manage Collection
+      </SectionTitle>
+      <div className="mt-3.5 flex justify-center">
         <span className="rounded-pill border border-border-strong px-3 py-1 text-label-sm uppercase tracking-label text-text-secondary">
           {dresses.length} {dresses.length === 1 ? "dress" : "dresses"} in the
           catalogue

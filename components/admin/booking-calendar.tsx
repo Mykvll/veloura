@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { CalendarCheck, ShoppingBag, Droplets } from "lucide-react";
+import { SectionTitle } from "@/components/section-title";
 import type { CalendarRental, CalendarFitting } from "./types";
 
 function pad(n: number) {
@@ -132,15 +133,10 @@ export function BookingCalendar({
 
   return (
     <div>
-      {/* Header — title (gold) + subtitle, same pattern as the other sections. */}
-      <div>
-        <h1 className="font-display text-display-lg uppercase tracking-display text-text-accent">
-          Booking Calendar
-        </h1>
-        <p className="mt-1 text-body-sm text-text-secondary">
-          Fittings, rentals &amp; return / hand-wash days at a glance.
-        </p>
-      </div>
+      {/* Centered gold section title, like every admin section. */}
+      <SectionTitle subtitle="Fittings, rentals & return / wash days at a glance">
+        Booking Calendar
+      </SectionTitle>
 
       <div className="mt-8 grid grid-cols-1 items-start gap-6 rounded-lg border border-border-soft bg-background-card p-4 shadow-card lg:grid-cols-[1.2fr_1fr] lg:gap-7 lg:p-6">
         {/* Left column — month header + day grid + legend. */}

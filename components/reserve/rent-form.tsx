@@ -102,7 +102,9 @@ export function RentForm({
       setIdPath(path);
       setIdName(file.name);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "ID upload failed.");
+      // Log the technical detail for us; show the customer a calm, plain message.
+      console.error("ID upload failed", e);
+      setError("Sorry — your ID didn't upload. Please try again.");
       setIdPath(null);
       setIdName("");
     } finally {
@@ -260,7 +262,7 @@ export function RentForm({
         type="button"
         onClick={handleContinue}
         disabled={!canSubmit}
-        className="flex min-h-tap w-full items-center justify-center rounded-lg bg-brand-primary px-6 text-label-base uppercase tracking-label text-text-on-primary transition-fast hover:bg-brand-primary-hover disabled:opacity-50"
+        className="flex h-[52px] w-full items-center justify-center rounded-pill bg-brand-primary px-6 text-label-base uppercase tracking-label text-text-on-primary transition-fast hover:bg-brand-primary-hover active:bg-brand-primary-active disabled:opacity-50"
       >
         Continue to payment
       </button>
