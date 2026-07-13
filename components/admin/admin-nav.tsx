@@ -7,13 +7,13 @@
  * these links scroll to a section by id rather than navigating to a route.
  */
 const LINKS = [
-  { id: "analytics", label: "Analytics" },
+  { id: "calendar", label: "Calendar" },
+  { id: "bookings", label: "Bookings" },
   { id: "dresses", label: "Dresses" },
   { id: "accessories", label: "Accessories" },
-  { id: "payments", label: "Payments" },
-  { id: "bookings", label: "Bookings" },
   { id: "history", label: "History" },
-  { id: "calendar", label: "Calendar" },
+  { id: "analytics", label: "Analytics" },
+  { id: "payments", label: "Payments" },
 ] as const;
 
 export function AdminNav() {

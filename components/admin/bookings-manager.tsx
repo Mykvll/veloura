@@ -101,8 +101,8 @@ export function BookingsManager({
   return (
     <div>
       {/* Centered gold section title, like every admin section. */}
-      <SectionTitle subtitle="Verify payment proofs — remove bookings with fake, wrong or missing payments">
-        Bookings &amp; Payments
+      <SectionTitle subtitle="Verify payment proofs — completed rentals move to Rental History automatically">
+        Bookings
       </SectionTitle>
 
       {error ? (
@@ -112,7 +112,7 @@ export function BookingsManager({
       <div className="mt-8 flex flex-col gap-3.5">
         {bookings.length === 0 ? (
           <div className="rounded-lg border border-border-soft bg-background-card p-6 text-center text-body-sm text-text-secondary">
-            No bookings yet.
+            No active bookings — completed rentals live in Rental History.
           </div>
         ) : (
           bookings.map((b) => {

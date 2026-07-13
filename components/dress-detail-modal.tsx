@@ -223,6 +223,7 @@ export function DressDetailModal({
                   <AvailabilityCalendar
                     blocked={blockedDates}
                     dressId={dress.id}
+                    dressName={dress.name}
                     mode={mode}
                     selected={date}
                     onSelect={setDate}

@@ -81,20 +81,27 @@ export type AdminBooking = {
 };
 
 /**
- * A pre-system rental as the admin Rental History section works with it. Maps
- * to a `rental_history` row (dress name is the snapshot taken when logged).
- * These exist only for lifetime earnings + wear counts — they skip payment
- * verification and never block calendar dates.
+ * A rental history entry as the admin Rental History section works with it.
+ * Can be either a completed booking (verified + wash day in past) or a
+ * manually logged pre-system rental. The `source` field distinguishes them:
+ * "Booking" = completed booking; "Logged" = manually logged rental_history row.
+ * Completed bookings have contact and delivery info; logged rentals don't.
  */
 export type AdminPastRental = {
   id: string;
   renter: string;
   dress: string;
-  /** Rental dates, ISO "YYYY-MM-DD" (always in the past). */
+  /** Rental dates, ISO "YYYY-MM-DD". */
   start: string;
   end: string;
   /** What they actually paid (rental + any add-ons), whole pesos. */
   amount: number;
+  /** "Booking" = completed booking; "Logged" = manually logged pre-system rental. */
+  source: "Booking" | "Logged";
+  /** Only present for "Booking" source — the customer's contact number. */
+  contact?: string | null;
+  /** Only present for "Booking" source — the dress ID. */
+  dressId?: string | null;
 };
 
 /**

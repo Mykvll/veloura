@@ -42,8 +42,7 @@ function niceDate(iso: string) {
  * on the mode:
  *
  *  - RENT: only days when THIS dress is blocked (its rental + wash day) are
- *    disabled. A day when a *different* dress is out still shows a red dot
- *    (something is booked) but stays selectable — this dress is free.
+ *    disabled. Shows only THIS dress's availability, not other dresses.
  *  - FITTING: any day when ANY dress is blocked is disabled — a fitting can't
  *    share a day with a rental hand-off.
  *
@@ -52,6 +51,7 @@ function niceDate(iso: string) {
 export function AvailabilityCalendar({
   blocked,
   dressId,
+  dressName,
   mode,
   selected,
   onSelect,
@@ -59,6 +59,8 @@ export function AvailabilityCalendar({
   blocked: BlockedDate[];
   /** The dress being reserved — used to pick out its own blocked days in RENT mode. */
   dressId: string;
+  /** The name of the dress, used in the legend and detail text. */
+  dressName: string;
   mode: "rent" | "fitting";
   selected: string | null;
   onSelect: (day: string) => void;
@@ -210,27 +212,25 @@ export function AvailabilityCalendar({
         })}
       </div>
 
-      {/* Legend. */}
+      {/* Legend — shows only this dress's availability. */}
       <div className="mt-3 flex flex-wrap justify-center gap-4 text-body-sm text-text-secondary">
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-state-error" /> Dress rented
-          out
+          <span className="h-2 w-2 rounded-full bg-state-error" /> {dressName}{" "}
+          not available
         </span>
       </div>
 
-      {/* Selected-day detail: what's open or out on the chosen date. */}
+      {/* Selected-day detail: whether this specific dress is available. */}
       {selected ? (
         <div className="mt-2.5 rounded-md bg-background-panel p-3 text-body-sm">
           <b className="text-label-sm uppercase tracking-label text-text-heading">
             {niceDate(selected)}
           </b>
           <div className="mt-1 text-text-secondary">
-            {selectedNames.length === 0 ? (
-              "Fully open — all dresses available."
+            {selectedNames.includes(dressName) ? (
+              <div>{dressName} is being rented out or being cleaned on this date.</div>
             ) : (
-              selectedNames.map((name) => (
-                <div key={name}>{name} is unavailable</div>
-              ))
+              <div>{dressName} is available on this date.</div>
             )}
           </div>
         </div>

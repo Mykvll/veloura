@@ -126,9 +126,9 @@ export default async function AdminDashboardPage() {
     .in("payment_status", ["pending", "verified"])
     .not("fitting_date", "is", null);
 
-  // Rentals for the Bookings & Payments section (fittings have no payment proof
-  // to verify). Newest first so the latest reservation sits at the top. Admin
-  // can read every booking incl. the PII, per the "admin read bookings" policy.
+  // Rentals for the Bookings section (fittings have no payment proof to verify).
+  // Newest first so the latest reservation sits at the top. Admin can read every
+  // booking incl. the PII, per the "admin read bookings" policy.
   const { data: rentalRows } = await supabase
     .from("bookings")
     .select(
@@ -204,7 +204,7 @@ export default async function AdminDashboardPage() {
   // admin) we mint a short-lived SIGNED URL for each proof: a link with a
   // time-limited token baked in that lets the admin's browser load just that one
   // file for the next hour, without ever making the bucket public.
-  const bookingRows: AdminBooking[] = await Promise.all(
+  const allBookings: AdminBooking[] = await Promise.all(
     (rentalRows ?? []).map(async (b) => {
       let proofUrl: string | null = null;
       if (b.proof_url) {
@@ -229,6 +229,26 @@ export default async function AdminDashboardPage() {
       };
     }),
   );
+
+  // Split bookings: completed (verified + wash day in past) vs active.
+  // A booking is completed when: payment_status = "verified" AND end_date + 1 < today.
+  // Completed bookings move to Rental History; active bookings stay in Bookings.
+  const today = new Date().toISOString().split("T")[0];
+  const bookingRows = allBookings.filter((b) => {
+    if (b.status !== "verified" || !b.end) return true; // non-verified stay active
+    const washDay = new Date(b.end);
+    washDay.setDate(washDay.getDate() + 1);
+    const washDayIso = washDay.toISOString().split("T")[0];
+    return washDayIso >= today; // keep if wash day is today or in future
+  });
+
+  const completedBookings = allBookings.filter((b) => {
+    if (b.status !== "verified" || !b.end) return false;
+    const washDay = new Date(b.end);
+    washDay.setDate(washDay.getDate() + 1);
+    const washDayIso = washDay.toISOString().split("T")[0];
+    return washDayIso < today; // completed if wash day is in past
+  });
 
   // ---- Analytics (verified bookings + logged history) -----------------------
   // Computed here so it recomputes on every load; the page is force-dynamic and
@@ -314,29 +334,57 @@ export default async function AdminDashboardPage() {
       : null,
   };
 
-  // Shape history rows for the Rental History section, and the slim dress
-  // list its "Log past rental" modal picks from (price pre-fills the amount).
-  const historyRows: AdminPastRental[] = (pastRentals ?? []).map((h) => ({
+  // Shape history rows for the Rental History section: completed bookings
+  // (merged with manually logged pre-system rentals), sorted newest first.
+  const completedBookingsAsHistory: AdminPastRental[] = completedBookings.map((b) => ({
+    id: b.id,
+    renter: b.renter,
+    dress: b.dress,
+    start: b.start as string,
+    end: b.end as string,
+    amount: b.amount,
+    source: "Booking",
+    contact: b.contact,
+    dressId: b.dressId,
+  }));
+
+  const loggedAsHistory: AdminPastRental[] = (pastRentals ?? []).map((h) => ({
     id: h.id,
     renter: h.renter_name,
     dress: h.dress_name,
     start: h.start_date,
     end: h.end_date,
     amount: h.amount_paid,
+    source: "Logged",
   }));
+
+  // Merge and sort by start_date desc (newest first).
+  const historyRows = [...completedBookingsAsHistory, ...loggedAsHistory].sort(
+    (a, b) => b.start.localeCompare(a.start) || b.id.localeCompare(a.id),
+  );
+
   const historyDressOptions = rows.map((d) => ({
     id: d.id,
     name: d.name,
     price: d.price,
   }));
 
-  // Stacked sections on one page. The anchor ids (#analytics, #dresses, …) are
+  // Stacked sections on one page. The anchor ids (#calendar, #bookings, …) are
   // what the top nav scrolls to; scroll-mt keeps a section's heading clear of
-  // the header when you jump to it.
+  // the header when you jump to it. New order: Calendar, Bookings, Dresses,
+  // Accessories, History, Analytics, Payments.
   return (
     <div className="flex flex-col gap-20">
-      <section id="analytics" className="scroll-mt-24">
-        <AnalyticsSummary data={analytics} />
+      <section id="calendar" className="scroll-mt-24">
+        <BookingCalendar
+          rentals={calendarRentals}
+          fittings={calendarFittings}
+        />
+      </section>
+
+      <section id="bookings" className="scroll-mt-24">
+        {/* historyDressOptions doubles as the manual-booking dress picker. */}
+        <BookingsManager bookings={bookingRows} dresses={historyDressOptions} />
       </section>
 
       <section id="dresses" className="scroll-mt-24">
@@ -358,6 +406,14 @@ export default async function AdminDashboardPage() {
         )}
       </section>
 
+      <section id="history" className="scroll-mt-24">
+        <HistoryManager entries={historyRows} dresses={historyDressOptions} />
+      </section>
+
+      <section id="analytics" className="scroll-mt-24">
+        <AnalyticsSummary data={analytics} />
+      </section>
+
       <section id="payments" className="scroll-mt-24">
         {paymentMethodsError ? (
           <div>
@@ -372,22 +428,6 @@ export default async function AdminDashboardPage() {
         ) : (
           <PaymentMethodsManager methods={paymentMethodRows} />
         )}
-      </section>
-
-      <section id="bookings" className="scroll-mt-24">
-        {/* historyDressOptions doubles as the manual-booking dress picker. */}
-        <BookingsManager bookings={bookingRows} dresses={historyDressOptions} />
-      </section>
-
-      <section id="history" className="scroll-mt-24">
-        <HistoryManager entries={historyRows} dresses={historyDressOptions} />
-      </section>
-
-      <section id="calendar" className="scroll-mt-24">
-        <BookingCalendar
-          rentals={calendarRentals}
-          fittings={calendarFittings}
-        />
       </section>
     </div>
   );
