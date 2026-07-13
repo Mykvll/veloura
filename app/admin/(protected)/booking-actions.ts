@@ -123,13 +123,42 @@ export async function flagBookingInvalid(id: string): Promise<ActionResult> {
 export async function deleteBooking(id: string): Promise<ActionResult> {
   const supabase = await createClient();
 
-  const status = await currentStatus(supabase, id);
-  if (status === null) return { error: null }; // already gone
+  // Read status + the private-bucket file paths in one go, BEFORE the row is
+  // gone — once deleted we can no longer learn which files belonged to it.
+  const { data: booking } = await supabase
+    .from("bookings")
+    .select("payment_status, id_photo_url, proof_url")
+    .eq("id", id)
+    .single();
+  if (!booking) return { error: null }; // already gone
 
-  if (status === "verified") await adjustStockForBooking(supabase, id, 1);
+  if (booking.payment_status === "verified") {
+    await adjustStockForBooking(supabase, id, 1);
+  }
 
   const { error } = await supabase.from("bookings").delete().eq("id", id);
   if (error) return { error: error.message };
+
+  // PII cleanup (business rule 3 / PH Data Privacy Act): remove the customer's
+  // ID photo and payment proof from the private payment-proofs bucket now that
+  // the booking is gone. Both columns store storage PATHS, not URLs. This runs
+  // as the authenticated admin — see the "admin delete payment-proofs" storage
+  // policy. Best-effort: the row is already deleted, so if the storage remove
+  // fails we log it rather than failing (and re-orphaning) the whole action.
+  const paths = [booking.id_photo_url, booking.proof_url].filter(
+    (p): p is string => Boolean(p),
+  );
+  if (paths.length > 0) {
+    const { error: storageError } = await supabase.storage
+      .from("payment-proofs")
+      .remove(paths);
+    if (storageError) {
+      console.error(
+        `deleteBooking: booking ${id} deleted but its files could not be removed:`,
+        storageError.message,
+      );
+    }
+  }
 
   revalidatePath("/admin");
   revalidatePath("/");
