@@ -81,7 +81,7 @@ export type Database = {
         Row: {
           address: string | null
           amount: number | null
-          contact: string
+          contact: string | null
           created_at: string | null
           deliver_time: string | null
           dress_id: string | null
@@ -91,6 +91,7 @@ export type Database = {
           fitting_time: string | null
           id: string
           id_photo_url: string | null
+          manual: boolean
           parking: boolean | null
           payment_method: string | null
           payment_status: string
@@ -104,7 +105,7 @@ export type Database = {
         Insert: {
           address?: string | null
           amount?: number | null
-          contact: string
+          contact?: string | null
           created_at?: string | null
           deliver_time?: string | null
           dress_id?: string | null
@@ -114,6 +115,7 @@ export type Database = {
           fitting_time?: string | null
           id?: string
           id_photo_url?: string | null
+          manual?: boolean
           parking?: boolean | null
           payment_method?: string | null
           payment_status?: string
@@ -127,7 +129,7 @@ export type Database = {
         Update: {
           address?: string | null
           amount?: number | null
-          contact?: string
+          contact?: string | null
           created_at?: string | null
           deliver_time?: string | null
           dress_id?: string | null
@@ -137,6 +139,7 @@ export type Database = {
           fitting_time?: string | null
           id?: string
           id_photo_url?: string | null
+          manual?: boolean
           parking?: boolean | null
           payment_method?: string | null
           payment_status?: string

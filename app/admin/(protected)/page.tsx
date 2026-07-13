@@ -132,8 +132,8 @@ export default async function AdminDashboardPage() {
   const { data: rentalRows } = await supabase
     .from("bookings")
     .select(
-      `id, renter_name, dress_name, contact, start_date, end_date,
-       deliver_time, amount, payment_status, proof_url`,
+      `id, renter_name, dress_id, dress_name, contact, start_date, end_date,
+       deliver_time, amount, payment_status, manual, proof_url`,
     )
     .eq("type", "rent")
     .order("created_at", { ascending: false });
@@ -217,12 +217,14 @@ export default async function AdminDashboardPage() {
         id: b.id,
         renter: b.renter_name,
         dress: b.dress_name ?? "Dress",
+        dressId: b.dress_id,
         contact: b.contact,
         start: b.start_date,
         end: b.end_date,
         deliver: b.deliver_time,
         amount: b.amount ?? 0,
         status: b.payment_status,
+        manual: b.manual,
         proofUrl,
       };
     }),
@@ -373,7 +375,8 @@ export default async function AdminDashboardPage() {
       </section>
 
       <section id="bookings" className="scroll-mt-24">
-        <BookingsManager bookings={bookingRows} />
+        {/* historyDressOptions doubles as the manual-booking dress picker. */}
+        <BookingsManager bookings={bookingRows} dresses={historyDressOptions} />
       </section>
 
       <section id="history" className="scroll-mt-24">
