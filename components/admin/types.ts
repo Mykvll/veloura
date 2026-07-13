@@ -62,7 +62,11 @@ export type AdminBooking = {
   id: string;
   renter: string;
   dress: string;
-  contact: string;
+  /** Which dress the booking holds — the manual-booking calendar uses this to
+   *  work out the chosen dress's taken days. Null if the dress was deleted. */
+  dressId: string | null;
+  /** Contact number; manual bookings don't carry one (the DM has it). */
+  contact: string | null;
   /** Rental dates + preferred delivery time (ISO days / "10:00 AM"). */
   start: string | null;
   end: string | null;
@@ -70,6 +74,8 @@ export type AdminBooking = {
   amount: number;
   /** 'none' | 'pending' | 'verified' | 'invalid'. */
   status: string;
+  /** Admin-entered (FB/IG/TikTok/walk-in) — no proof; payment set directly. */
+  manual: boolean;
   /** Signed URL of the payment screenshot, or null if none was uploaded. */
   proofUrl: string | null;
 };

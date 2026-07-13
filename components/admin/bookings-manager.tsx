@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { BadgeCheck, Clock, ShieldAlert, ImageOff } from "lucide-react";
+import { BadgeCheck, Clock, ShieldAlert, ImageOff, PenLine } from "lucide-react";
 import { niceDate } from "@/lib/reserve";
 import {
   verifyBooking,
@@ -10,6 +10,10 @@ import {
   deleteBooking,
 } from "@/app/admin/(protected)/booking-actions";
 import { SectionTitle } from "@/components/section-title";
+import {
+  ManualBookingModal,
+  type ManualBookingDressOption,
+} from "./manual-booking-modal";
 import type { AdminBooking } from "./types";
 
 /**
@@ -55,11 +59,19 @@ const STATUS_META: Record<
  * public URL for it. Verifying/flagging/deleting all run on the server, where
  * accessory stock is kept in sync (see booking-actions.ts).
  */
-export function BookingsManager({ bookings }: { bookings: AdminBooking[] }) {
+export function BookingsManager({
+  bookings,
+  dresses,
+}: {
+  bookings: AdminBooking[];
+  /** The catalogue, for the Add-manual-booking modal's dress picker. */
+  dresses: ManualBookingDressOption[];
+}) {
   const router = useRouter();
   // The proof shown full-size in the lightbox, the card mid-delete-confirm, and
   // the card with an action in flight (to disable its buttons).
   const [proofView, setProofView] = useState<AdminBooking | null>(null);
+  const [adding, setAdding] = useState(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   // Which card+button has an action in flight — the kind lets each button show
   // its own "…ing" label instead of all of them changing at once.
@@ -104,7 +116,15 @@ export function BookingsManager({ bookings }: { bookings: AdminBooking[] }) {
           </div>
         ) : (
           bookings.map((b) => {
-            const meta = STATUS_META[b.status] ?? STATUS_META.pending;
+            let meta = STATUS_META[b.status] ?? STATUS_META.pending;
+            // A manual booking has no proof to inspect, so its states read as
+            // plain money facts, not verification steps.
+            if (b.manual) {
+              if (b.status === "verified")
+                meta = { ...meta, label: "Paid" };
+              else if (b.status === "pending")
+                meta = { ...meta, label: "Not yet paid" };
+            }
             const cardBusy = busy?.id === b.id;
             return (
               <div
@@ -140,30 +160,48 @@ export function BookingsManager({ bookings }: { bookings: AdminBooking[] }) {
                   <div className="mt-0.5 text-body-sm text-text-secondary">
                     {b.start ? niceDate(b.start) : "—"}
                     {b.end ? ` – ${niceDate(b.end)}` : ""}
-                    {b.deliver ? ` · deliver ${b.deliver}` : ""} · {b.contact}
+                    {b.deliver ? ` · deliver ${b.deliver}` : ""}
+                    {b.contact ? ` · ${b.contact}` : ""}
                   </div>
-                  <div
-                    className={`mt-1.5 inline-flex items-center gap-1.5 text-label-sm uppercase tracking-wide ${meta.className}`}
-                  >
-                    <meta.Icon className="h-3.5 w-3.5" />
-                    {meta.label}
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2.5">
+                    <span
+                      className={`inline-flex items-center gap-1.5 text-label-sm uppercase tracking-wide ${meta.className}`}
+                    >
+                      <meta.Icon className="h-3.5 w-3.5" />
+                      {meta.label}
+                    </span>
+                    {/* Badge: admin-entered, so it can't pass for an app booking. */}
+                    {b.manual ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-pill border border-border-strong px-2.5 py-0.5 text-label-sm uppercase tracking-label text-text-secondary">
+                        <PenLine className="h-3.5 w-3.5" />
+                        Manual booking
+                      </span>
+                    ) : null}
                   </div>
                 </div>
 
-                {/* Actions */}
+                {/* Actions. A manual booking has no proof — its "verify" is a
+                    plain Mark-paid (same action; there are no add-ons whose
+                    stock could shift), and "Mark invalid" makes no sense. */}
                 <div className="flex flex-wrap items-center gap-2">
-                  {b.status !== "verified" && b.proofUrl ? (
+                  {b.status !== "verified" && (b.proofUrl || b.manual) ? (
                     <button
                       type="button"
                       onClick={() => run(b.id, "verify", verifyBooking)}
                       disabled={cardBusy}
                       className="inline-flex min-h-tap items-center justify-center rounded-pill bg-state-success px-3.5 text-label-sm uppercase tracking-wide text-text-on-primary transition-colors disabled:opacity-60"
                     >
-                      {cardBusy && busy?.kind === "verify" ? "Verifying…" : "Verify"}
+                      {cardBusy && busy?.kind === "verify"
+                        ? b.manual
+                          ? "Marking…"
+                          : "Verifying…"
+                        : b.manual
+                          ? "Mark paid"
+                          : "Verify"}
                     </button>
                   ) : null}
 
-                  {b.status === "pending" ? (
+                  {b.status === "pending" && !b.manual ? (
                     <button
                       type="button"
                       onClick={() => run(b.id, "invalid", flagBookingInvalid)}
@@ -211,7 +249,30 @@ export function BookingsManager({ bookings }: { bookings: AdminBooking[] }) {
             );
           })
         )}
+
+        {/* Add manual booking tile — same dashed add-tile as everywhere else. */}
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          className="flex min-h-[110px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border-strong bg-background-card text-text-secondary transition duration-fast ease-soft hover:border-brand-primary hover:text-text-heading focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-brand-primary/35"
+        >
+          <span className="flex h-11 w-11 items-center justify-center rounded-pill bg-brand-primary text-2xl leading-none text-text-on-primary">
+            +
+          </span>
+          <span className="text-label-base uppercase tracking-label">
+            Add manual booking
+          </span>
+        </button>
       </div>
+
+      {/* Add-manual-booking modal — fresh instance each time it opens. */}
+      {adding ? (
+        <ManualBookingModal
+          dresses={dresses}
+          bookings={bookings}
+          onClose={() => setAdding(false)}
+        />
+      ) : null}
 
       {/* Proof lightbox — the full-size signed-URL image. */}
       {proofView?.proofUrl ? (

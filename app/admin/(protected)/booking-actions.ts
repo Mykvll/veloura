@@ -5,6 +5,25 @@ import { createClient } from "@/lib/supabase/server";
 
 type ActionResult = { error: string | null };
 
+/**
+ * The data the "Add manual booking" modal sends us to save.
+ *
+ * A manual booking is a rental the admin takes herself (FB/IG/TikTok DMs,
+ * walk-ins). It's a REAL booking in the bookings table — it blocks its dates
+ * plus the wash day for customers via blocked_dates like any app booking —
+ * but there's no proof upload (payment status is set directly), no contact,
+ * and no date limits beyond "not on top of another customer's rental".
+ */
+export type ManualBookingInput = {
+  dressId: string;
+  renterName: string;
+  /** Reserved range, ISO "YYYY-MM-DD" — past or future, admin's call. */
+  startDate: string;
+  endDate: string;
+  /** true → 'verified' (counts as earned now); false → 'pending'. */
+  paid: boolean;
+};
+
 /** The server Supabase client type, derived so we don't import the generic. */
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -67,6 +86,80 @@ async function currentStatus(
 }
 
 /**
+ * Create one manual booking.
+ *
+ * Server-side clash rule (mirroring the modal's calendar): the range may not
+ * overlap another active rental's START..END days for this dress — but wash
+ * days (end + 1) are fine to book over: the admin hand-washes the dresses
+ * herself and knows when they'll be ready. That's why this checks bookings
+ * directly instead of blocked_dates, which bakes wash days in. Same
+ * check-then-insert race caveat as the reserve flow — fine at this volume.
+ */
+export async function createManualBooking(
+  input: ManualBookingInput,
+): Promise<ActionResult> {
+  const supabase = await createClient();
+
+  const renterName = input.renterName.trim();
+  if (!renterName) return { error: "Please enter the renter's name." };
+  if (!input.startDate || !input.endDate) {
+    return { error: "Please pick the reserved dates." };
+  }
+  if (input.endDate < input.startDate) {
+    return { error: "The end date can't be before the start date." };
+  }
+
+  // Snapshot the dress like the customer flow does: the name so the booking
+  // survives a rename/delete, the price (not anything client-sent) as amount.
+  const { data: dress, error: dressErr } = await supabase
+    .from("dresses")
+    .select("id, name, price")
+    .eq("id", input.dressId)
+    .single();
+  if (dressErr || !dress) {
+    return { error: "Please choose a dress from the catalogue." };
+  }
+
+  // Ranges [a.start, a.end] and [b.start, b.end] overlap iff
+  // a.start <= b.end AND a.end >= b.start.
+  const { data: clash, error: clashErr } = await supabase
+    .from("bookings")
+    .select("id")
+    .eq("dress_id", input.dressId)
+    .eq("type", "rent")
+    .in("payment_status", ["pending", "verified"])
+    .lte("start_date", input.endDate)
+    .gte("end_date", input.startDate)
+    .limit(1);
+  if (clashErr) {
+    return { error: "Couldn't confirm the dates. Please try again." };
+  }
+  if (clash && clash.length > 0) {
+    return {
+      error: "Those dates overlap another booking for this dress.",
+    };
+  }
+
+  const { error } = await supabase.from("bookings").insert({
+    type: "rent",
+    manual: true,
+    payment_status: input.paid ? "verified" : "pending",
+    renter_name: renterName,
+    dress_id: dress.id,
+    dress_name: dress.name, // snapshot
+    start_date: input.startDate,
+    end_date: input.endDate,
+    amount: dress.price,
+  });
+  if (error) return { error: error.message };
+
+  // The new booking blocks its dates for customers too — refresh both sites.
+  revalidatePath("/admin");
+  revalidatePath("/");
+  return { error: null };
+}
+
+/**
  * Verify a payment. Sets status to 'verified' and, if the booking wasn't already
  * verified, decrements its accessories' stock once (business rule 2).
  */
@@ -123,13 +216,42 @@ export async function flagBookingInvalid(id: string): Promise<ActionResult> {
 export async function deleteBooking(id: string): Promise<ActionResult> {
   const supabase = await createClient();
 
-  const status = await currentStatus(supabase, id);
-  if (status === null) return { error: null }; // already gone
+  // Read status + the private-bucket file paths in one go, BEFORE the row is
+  // gone — once deleted we can no longer learn which files belonged to it.
+  const { data: booking } = await supabase
+    .from("bookings")
+    .select("payment_status, id_photo_url, proof_url")
+    .eq("id", id)
+    .single();
+  if (!booking) return { error: null }; // already gone
 
-  if (status === "verified") await adjustStockForBooking(supabase, id, 1);
+  if (booking.payment_status === "verified") {
+    await adjustStockForBooking(supabase, id, 1);
+  }
 
   const { error } = await supabase.from("bookings").delete().eq("id", id);
   if (error) return { error: error.message };
+
+  // PII cleanup (business rule 3 / PH Data Privacy Act): remove the customer's
+  // ID photo and payment proof from the private payment-proofs bucket now that
+  // the booking is gone. Both columns store storage PATHS, not URLs. This runs
+  // as the authenticated admin — see the "admin delete payment-proofs" storage
+  // policy. Best-effort: the row is already deleted, so if the storage remove
+  // fails we log it rather than failing (and re-orphaning) the whole action.
+  const paths = [booking.id_photo_url, booking.proof_url].filter(
+    (p): p is string => Boolean(p),
+  );
+  if (paths.length > 0) {
+    const { error: storageError } = await supabase.storage
+      .from("payment-proofs")
+      .remove(paths);
+    if (storageError) {
+      console.error(
+        `deleteBooking: booking ${id} deleted but its files could not be removed:`,
+        storageError.message,
+      );
+    }
+  }
 
   revalidatePath("/admin");
   revalidatePath("/");

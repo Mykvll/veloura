@@ -81,7 +81,7 @@ export type Database = {
         Row: {
           address: string | null
           amount: number | null
-          contact: string
+          contact: string | null
           created_at: string | null
           deliver_time: string | null
           dress_id: string | null
@@ -91,6 +91,7 @@ export type Database = {
           fitting_time: string | null
           id: string
           id_photo_url: string | null
+          manual: boolean
           parking: boolean | null
           payment_method: string | null
           payment_status: string
@@ -104,7 +105,7 @@ export type Database = {
         Insert: {
           address?: string | null
           amount?: number | null
-          contact: string
+          contact?: string | null
           created_at?: string | null
           deliver_time?: string | null
           dress_id?: string | null
@@ -114,6 +115,7 @@ export type Database = {
           fitting_time?: string | null
           id?: string
           id_photo_url?: string | null
+          manual?: boolean
           parking?: boolean | null
           payment_method?: string | null
           payment_status?: string
@@ -127,7 +129,7 @@ export type Database = {
         Update: {
           address?: string | null
           amount?: number | null
-          contact?: string
+          contact?: string | null
           created_at?: string | null
           deliver_time?: string | null
           dress_id?: string | null
@@ -137,6 +139,7 @@ export type Database = {
           fitting_time?: string | null
           id?: string
           id_photo_url?: string | null
+          manual?: boolean
           parking?: boolean | null
           payment_method?: string | null
           payment_status?: string
@@ -392,7 +395,19 @@ export type Database = {
       }
     }
     Functions: {
-      [_ in never]: never
+      clear_booking_files: {
+        Args: { booking_id: string; clear_id: boolean; clear_proof: boolean }
+        Returns: undefined
+      }
+      list_invalid_expired_pii: {
+        Args: { grace_days: number }
+        Returns: {
+          id: string
+          id_photo_url: string
+          proof_url: string
+        }[]
+      }
+      verify_cron_secret: { Args: { candidate: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
