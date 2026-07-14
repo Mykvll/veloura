@@ -3,15 +3,21 @@
 import { useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { AccessoryPicker, type CustomerAccessory } from "../accessory-picker";
-import type { RentBookingInput } from "@/app/reserve-actions";
+import { createRentHold } from "@/app/reserve-actions";
+import { saveHold } from "@/lib/hold-storage";
 import { DELIVERY_TIMES, niceDate } from "@/lib/reserve";
 
-/** What the rent form hands to the payment step: the booking details it has
- *  collected (everything except the payment channel + proof, which come next)
- *  plus the running total, shown as the amount due. */
-export type RentContinueData = {
-  input: Omit<RentBookingInput, "paymentMethod" | "proofPath">;
+/** What the rent form hands to the payment step once the hold is created: the
+ *  booking id + the server-anchored expiry that drives the payment countdown,
+ *  plus the date and running total for the payment summary. */
+export type RentPaymentContext = {
+  bookingId: string;
+  date: string;
   total: number;
+  /** ISO timestamp the hold lapses (server clock). */
+  holdExpiresAt: string;
+  /** Server "now" when the hold was created — for a skew-proof countdown. */
+  serverNow: string;
 };
 
 /* Small brand-token field label, mirroring the admin editors. */
@@ -62,8 +68,8 @@ export function RentForm({
   accessories: CustomerAccessory[];
   /** The rental date picked on the calendar, or null until one is chosen. */
   date: string | null;
-  /** Advance to the payment step, carrying the collected booking details. */
-  onContinue: (data: RentContinueData) => void;
+  /** Advance to the payment step once the hold is created. */
+  onContinue: (ctx: RentPaymentContext) => void;
 }) {
   const supabase = createClient();
 
@@ -80,6 +86,8 @@ export function RentForm({
   const [uploading, setUploading] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
+  // In-flight while create_rent_hold runs (holds the date + starts the timer).
+  const [reserving, setReserving] = useState(false);
 
   const toggle = (id: string) =>
     setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
@@ -119,24 +127,41 @@ export function RentForm({
     !!address.trim() &&
     !!deliverTime &&
     !!idPath &&
-    !uploading;
+    !uploading &&
+    !reserving;
 
-  // Hand the collected details to the payment step. Nothing is saved yet — the
-  // booking row is written only after payment proof is submitted there.
-  function handleContinue() {
-    if (!date || !idPath) return;
+  // Create the hold NOW (this is where the date is first held + the 10-minute
+  // payment window starts), then advance to payment. On a date clash the RPC
+  // returns a friendly message and we stay put.
+  async function handleContinue() {
+    if (!date || !idPath || reserving) return;
+    setError(null);
+    setReserving(true);
+    const bookingId = crypto.randomUUID();
+    const res = await createRentHold({
+      bookingId,
+      dressId: dress.id,
+      name,
+      contact,
+      address,
+      idPath,
+      date,
+      deliverTime,
+      accessoryIds: picked,
+    });
+    setReserving(false);
+    if (res.error || !res.bookingId || !res.holdExpiresAt || !res.serverNow) {
+      setError(res.error ?? "Something went wrong. Please try again.");
+      return;
+    }
+    // Remember the hold so an accidental refresh can resume the payment step.
+    saveHold({ bookingId: res.bookingId, dressId: dress.id, date, total });
     onContinue({
-      input: {
-        dressId: dress.id,
-        name,
-        contact,
-        address,
-        idPath,
-        date,
-        deliverTime,
-        accessoryIds: picked,
-      },
+      bookingId: res.bookingId,
+      date,
       total,
+      holdExpiresAt: res.holdExpiresAt,
+      serverNow: res.serverNow,
     });
   }
 
@@ -264,7 +289,7 @@ export function RentForm({
         disabled={!canSubmit}
         className="flex h-[52px] w-full items-center justify-center rounded-pill bg-brand-primary px-6 text-label-base uppercase tracking-label text-text-on-primary transition-fast hover:bg-brand-primary-hover active:bg-brand-primary-active disabled:opacity-50"
       >
-        Continue to payment
+        {reserving ? "Reserving your date…" : "Continue to payment"}
       </button>
     </div>
   );

@@ -1,11 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DressCard } from "./dress-card";
-import { DressDetailModal, type DressDetail } from "./dress-detail-modal";
+import {
+  DressDetailModal,
+  type DressDetail,
+  type ResumeHold,
+} from "./dress-detail-modal";
 import type { CustomerAccessory } from "./accessory-picker";
 import type { PaymentOption } from "./reserve/payment-step";
 import type { BlockedDate } from "./availability-calendar";
+import { createClient } from "@/lib/supabase/client";
+import { loadHold, clearHold } from "@/lib/hold-storage";
 
 /**
  * The collection grid + dress-detail modal, on one page ("/").
@@ -16,10 +22,11 @@ import type { BlockedDate } from "./availability-calendar";
  *
  * MODAL STATE: we keep a single `openId` (the dress being viewed) rather than a
  * boolean + a copy of the dress. Tapping a card sets `openId`; the modal reads
- * the matching dress straight out of the `dresses` array we already have. Only
- * one modal exists at a time, and closing just clears `openId`. Because the
- * dress data is already in memory, opening the modal is instant — no navigation,
- * no second fetch.
+ * the matching dress straight out of the `dresses` array we already have.
+ *
+ * REFRESH RESUME: on mount we check sessionStorage for an in-progress payment
+ * hold (see payment-window-refresh.md). If one is still live server-side, we
+ * reopen its dress straight on the payment step with the countdown resumed.
  */
 export function CollectionGallery({
   dresses,
@@ -39,7 +46,69 @@ export function CollectionGallery({
   fittingsBooked: Record<string, string[]>;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
+  // A hold recovered after a refresh, plus the dress it belongs to.
+  const [resume, setResume] = useState<ResumeHold | null>(null);
+  const [resumeDressId, setResumeDressId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const stored = loadHold();
+    if (!stored) return;
+    // Only resume a dress we actually have on the page.
+    if (!dresses.some((d) => d.id === stored.dressId)) {
+      clearHold();
+      return;
+    }
+    const supabase = createClient();
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase.rpc("get_hold_status", {
+        p_booking_id: stored.bookingId,
+      });
+      if (cancelled) return;
+      const s = data as {
+        status?: string;
+        hold_expires_at?: string;
+        server_now?: string;
+      } | null;
+      const live =
+        !error &&
+        s &&
+        s.status === "hold" &&
+        s.hold_expires_at &&
+        s.server_now &&
+        new Date(s.hold_expires_at).getTime() > new Date(s.server_now).getTime();
+      if (!live) {
+        clearHold();
+        return;
+      }
+      setResume({
+        bookingId: stored.bookingId,
+        date: stored.date,
+        total: stored.total,
+        holdExpiresAt: s!.hold_expires_at!,
+        serverNow: s!.server_now!,
+        methodId: stored.methodId,
+        proofPath: stored.proofPath,
+      });
+      setResumeDressId(stored.dressId);
+      setOpenId(stored.dressId);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Run once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const openDress = dresses.find((d) => d.id === openId) ?? null;
+
+  const closeModal = () => {
+    setOpenId(null);
+    // A resumed session is one-shot: after it closes, reopening the dress starts
+    // a fresh reservation rather than re-entering the old hold.
+    setResume(null);
+    setResumeDressId(null);
+  };
 
   return (
     <>
@@ -71,7 +140,8 @@ export function CollectionGallery({
           paymentMethods={paymentMethods}
           blockedDates={blockedDates}
           fittingsBooked={fittingsBooked}
-          onClose={() => setOpenId(null)}
+          resume={resumeDressId === openDress.id ? (resume ?? undefined) : undefined}
+          onClose={closeModal}
         />
       ) : null}
     </>

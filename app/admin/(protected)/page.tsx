@@ -133,9 +133,13 @@ export default async function AdminDashboardPage() {
     .from("bookings")
     .select(
       `id, renter_name, dress_id, dress_name, contact, start_date, end_date,
-       deliver_time, amount, payment_status, manual, proof_url`,
+       deliver_time, amount, payment_status, manual, proof_url, created_at`,
     )
     .eq("type", "rent")
+    // Live customer holds are transient (a 10-min payment window) — they aren't
+    // real bookings yet, so keep them out of the admin list, calendar, and
+    // analytics. They still block dates for customers via blocked_dates.
+    .neq("payment_status", "hold")
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -225,6 +229,7 @@ export default async function AdminDashboardPage() {
         amount: b.amount ?? 0,
         status: b.payment_status,
         manual: b.manual,
+        bookedAt: b.created_at,
         proofUrl,
       };
     }),

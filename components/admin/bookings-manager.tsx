@@ -2,12 +2,20 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { BadgeCheck, Clock, ShieldAlert, ImageOff, PenLine } from "lucide-react";
+import {
+  BadgeCheck,
+  Clock,
+  ShieldAlert,
+  ImageOff,
+  PenLine,
+  RotateCcw,
+} from "lucide-react";
 import { niceDate } from "@/lib/reserve";
 import {
   verifyBooking,
   flagBookingInvalid,
   deleteBooking,
+  markBookingRefunded,
 } from "@/app/admin/(protected)/booking-actions";
 import { SectionTitle } from "@/components/section-title";
 import {
@@ -44,7 +52,26 @@ const STATUS_META: Record<
     className: "text-state-error",
     Icon: ImageOff,
   },
+  refunded: {
+    label: "Refunded",
+    className: "text-text-secondary",
+    Icon: RotateCcw,
+  },
 };
+
+/** "Jul 13, 2026 · 3:42 PM" — when the booking was made. */
+function bookedLabel(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
 
 /**
  * The "Bookings & Payments" section (admin.html → BookingsSection).
@@ -73,15 +100,19 @@ export function BookingsManager({
   const [proofView, setProofView] = useState<AdminBooking | null>(null);
   const [adding, setAdding] = useState(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [confirmRefundId, setConfirmRefundId] = useState<string | null>(null);
   // Which card+button has an action in flight — the kind lets each button show
   // its own "…ing" label instead of all of them changing at once.
-  const [busy, setBusy] = useState<{ id: string; kind: "verify" | "invalid" | "delete" } | null>(null);
+  const [busy, setBusy] = useState<{
+    id: string;
+    kind: "verify" | "invalid" | "delete" | "refund";
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   function run(
     id: string,
-    kind: "verify" | "invalid" | "delete",
+    kind: "verify" | "invalid" | "delete" | "refund",
     action: (id: string) => Promise<{ error: string | null }>,
   ) {
     setError(null);
@@ -94,6 +125,7 @@ export function BookingsManager({
         return;
       }
       setConfirmId(null);
+      setConfirmRefundId(null);
       router.refresh();
     });
   }
@@ -178,6 +210,11 @@ export function BookingsManager({
                       </span>
                     ) : null}
                   </div>
+                  {b.bookedAt ? (
+                    <div className="mt-1 text-body-sm text-text-secondary">
+                      Booked {bookedLabel(b.bookedAt)}
+                    </div>
+                  ) : null}
                 </div>
 
                 {/* Actions. A manual booking has no proof — its "verify" is a
@@ -210,6 +247,45 @@ export function BookingsManager({
                     >
                       {cardBusy && busy?.kind === "invalid" ? "Marking…" : "Mark invalid"}
                     </button>
+                  ) : null}
+
+                  {/* Refund — records a refund (kept as a "Refunded" record) and
+                      frees the dates. Offered for paid / awaiting bookings. */}
+                  {b.status === "pending" || b.status === "verified" ? (
+                    confirmRefundId === b.id ? (
+                      <span className="inline-flex flex-wrap items-center gap-2 rounded-md bg-background-panel px-3 py-2 text-body-sm text-text-primary">
+                        Mark refunded &amp; free the dates?
+                        <button
+                          type="button"
+                          onClick={() => run(b.id, "refund", markBookingRefunded)}
+                          disabled={cardBusy}
+                          className="inline-flex min-h-tap items-center justify-center rounded-pill bg-text-secondary px-3.5 text-label-sm uppercase tracking-wide text-text-on-primary transition-colors disabled:opacity-60"
+                        >
+                          {cardBusy && busy?.kind === "refund"
+                            ? "Refunding…"
+                            : "Yes, refunded"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmRefundId(null)}
+                          disabled={cardBusy}
+                          className="inline-flex min-h-tap items-center justify-center rounded-pill border border-border-soft bg-white px-3.5 text-label-sm uppercase tracking-wide text-text-primary transition-colors hover:bg-background-panel disabled:opacity-60"
+                        >
+                          Keep
+                        </button>
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setError(null);
+                          setConfirmRefundId(b.id);
+                        }}
+                        className="inline-flex min-h-tap items-center justify-center rounded-pill border border-border-soft bg-white px-3.5 text-label-sm uppercase tracking-wide text-text-secondary transition-colors hover:bg-background-panel"
+                      >
+                        Mark refunded
+                      </button>
+                    )
                   ) : null}
 
                   {confirmId === b.id ? (

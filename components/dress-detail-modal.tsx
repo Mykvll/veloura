@@ -10,10 +10,21 @@ import {
   AvailabilityCalendar,
   type BlockedDate,
 } from "./availability-calendar";
-import { RentForm, type RentContinueData } from "./reserve/rent-form";
+import { RentForm, type RentPaymentContext } from "./reserve/rent-form";
 import { FittingForm } from "./reserve/fitting-form";
 import { PaymentStep, type PaymentOption } from "./reserve/payment-step";
 import { niceDate, FITTING_LOCATION } from "@/lib/reserve";
+
+/** A hold recovered from sessionStorage after a refresh, to reopen payment. */
+export type ResumeHold = {
+  bookingId: string;
+  date: string;
+  total: number;
+  holdExpiresAt: string;
+  serverNow: string;
+  methodId?: string;
+  proofPath?: string;
+};
 
 /** One renter review, already shaped for display. */
 export type DressReview = {
@@ -57,6 +68,7 @@ export function DressDetailModal({
   paymentMethods,
   blockedDates,
   fittingsBooked,
+  resume,
   onClose,
 }: {
   dress: DressDetail;
@@ -69,6 +81,9 @@ export function DressDetailModal({
   blockedDates: BlockedDate[];
   /** Already-taken fitting times, keyed by date, for the fitting form. */
   fittingsBooked: Record<string, string[]>;
+  /** When set, open straight on the payment step to resume a hold after a
+   *  refresh (see CollectionGallery + payment-window-refresh.md). */
+  resume?: ResumeHold;
   onClose: () => void;
 }) {
   // The wizard step. "details" is the dress page; "date" is the calendar +
@@ -76,15 +91,25 @@ export function DressDetailModal({
   // rent-only payment step; "done" is the confirmation after the booking is
   // saved. `mode` picks rent vs fitting.
   const [step, setStep] = useState<"details" | "date" | "payment" | "done">(
-    "details",
+    resume ? "payment" : "details",
   );
   const [mode, setMode] = useState<"rent" | "fitting">("rent");
-  const [date, setDate] = useState<string | null>(null);
+  const [date, setDate] = useState<string | null>(resume?.date ?? null);
 
-  // The rent details carried from the form into the payment step (the booking
-  // isn't saved until payment proof is submitted). Null until "Continue to
-  // payment" is pressed.
-  const [payment, setPayment] = useState<RentContinueData | null>(null);
+  // The hold context carried into the payment step: the held booking id + the
+  // server-anchored expiry that drives the countdown. Seeded from `resume` when
+  // reopening after a refresh, else null until "Continue to payment".
+  const [payment, setPayment] = useState<RentPaymentContext | null>(
+    resume
+      ? {
+          bookingId: resume.bookingId,
+          date: resume.date,
+          total: resume.total,
+          holdExpiresAt: resume.holdExpiresAt,
+          serverNow: resume.serverNow,
+        }
+      : null,
+  );
 
   // The renter photo open in the lightbox (null = closed). All review photos
   // show as thumbnails inside it.
@@ -198,12 +223,22 @@ export function DressDetailModal({
               // where the booking row is actually written.
               <PaymentStep
                 dressName={dress.name}
-                date={payment.input.date}
+                date={payment.date}
                 total={payment.total}
                 methods={paymentMethods}
-                input={payment.input}
+                bookingId={payment.bookingId}
+                holdExpiresAt={payment.holdExpiresAt}
+                serverNow={payment.serverNow}
+                initialMethodId={resume?.methodId}
+                initialProofPath={resume?.proofPath}
                 onPaid={() => setStep("done")}
                 onCancel={onClose}
+                onExpire={() => {
+                  setPayment(null);
+                  setDate(null);
+                  setMode("rent");
+                  setStep("date");
+                }}
               />
             ) : step === "date" ? (
               // Step 2: pick a date (left) and fill the reserve/fitting form

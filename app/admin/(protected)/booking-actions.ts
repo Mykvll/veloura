@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { addDays } from "@/lib/reserve";
 
 type ActionResult = { error: string | null };
 
@@ -22,6 +23,16 @@ export type ManualBookingInput = {
   endDate: string;
   /** true → 'verified' (counts as earned now); false → 'pending'. */
   paid: boolean;
+  /** Set once the admin confirms displacing a clashing customer booking. */
+  override?: boolean;
+};
+
+export type ManualBookingResult = {
+  error: string | null;
+  /** Present when the dates clash with a customer booking and `override` wasn't
+   *  set. The modal shows a confirm dialog ("Overriding will displace their
+   *  booking") and retries with override=true. */
+  conflict?: { renter: string; status: string; count: number };
 };
 
 /** The server Supabase client type, derived so we don't import the generic. */
@@ -97,7 +108,7 @@ async function currentStatus(
  */
 export async function createManualBooking(
   input: ManualBookingInput,
-): Promise<ActionResult> {
+): Promise<ManualBookingResult> {
   const supabase = await createClient();
 
   const renterName = input.renterName.trim();
@@ -120,24 +131,59 @@ export async function createManualBooking(
     return { error: "Please choose a dress from the catalogue." };
   }
 
-  // Ranges [a.start, a.end] and [b.start, b.end] overlap iff
-  // a.start <= b.end AND a.end >= b.start.
-  const { data: clash, error: clashErr } = await supabase
+  // Find ACTIVE bookings for this dress that would clash. "Active" now includes
+  // live customer holds — the `bookings_no_overlap` exclusion constraint counts
+  // them, so a manual booking over a hold must be resolved, not silently fail.
+  // Overlap uses each row's occupied range: a manual booking occupies
+  // [start, end+1) (no wash day — the admin washes); a customer rental occupies
+  // [start, end+2) (through the wash day). Ranges [a1,a2) and [b1,b2) overlap iff
+  // a1 < b2 AND b1 < a2.
+  const candEnd = addDays(input.endDate, 1); // exclusive upper of the manual range
+  const { data: activeRows, error: activeErr } = await supabase
     .from("bookings")
-    .select("id")
+    .select("id, start_date, end_date, payment_status, renter_name, manual")
     .eq("dress_id", input.dressId)
     .eq("type", "rent")
-    .in("payment_status", ["pending", "verified"])
-    .lte("start_date", input.endDate)
-    .gte("end_date", input.startDate)
-    .limit(1);
-  if (clashErr) {
+    .in("payment_status", ["hold", "pending", "verified"]);
+  if (activeErr) {
     return { error: "Couldn't confirm the dates. Please try again." };
   }
-  if (clash && clash.length > 0) {
+
+  const clashes = (activeRows ?? []).filter((b) => {
+    if (!b.start_date || !b.end_date) return false;
+    const bEnd = addDays(b.end_date, b.manual ? 1 : 2); // exclusive upper
+    return input.startDate < bEnd && b.start_date < candEnd;
+  });
+
+  if (clashes.length > 0 && !input.override) {
+    // Ask the admin to confirm the override before displacing anyone.
+    const first = clashes[0];
     return {
-      error: "Those dates overlap another booking for this dress.",
+      error: null,
+      conflict: {
+        renter: first.renter_name,
+        status: first.payment_status,
+        count: clashes.length,
+      },
     };
+  }
+
+  // Override confirmed: displace each clashing customer booking first, so the
+  // exclusion constraint permits the manual insert. Holds (unpaid) are dropped;
+  // paid/awaiting ones become `refunded` (kept as a record; the admin settles
+  // the refund off-app).
+  for (const b of clashes) {
+    if (b.payment_status === "hold") {
+      await supabase.from("bookings").delete().eq("id", b.id);
+    } else {
+      if (b.payment_status === "verified") {
+        await adjustStockForBooking(supabase, b.id, 1);
+      }
+      await supabase
+        .from("bookings")
+        .update({ payment_status: "refunded" })
+        .eq("id", b.id);
+    }
   }
 
   const { error } = await supabase.from("bookings").insert({
@@ -151,9 +197,45 @@ export async function createManualBooking(
     end_date: input.endDate,
     amount: dress.price,
   });
-  if (error) return { error: error.message };
+  if (error) {
+    // 23P01 = exclusion_violation: a booking slipped in between our check and
+    // insert. Surface it plainly rather than as a raw DB error.
+    if ((error as { code?: string }).code === "23P01") {
+      return {
+        error: "Those dates were just taken — please refresh and try again.",
+      };
+    }
+    return { error: error.message };
+  }
 
   // The new booking blocks its dates for customers too — refresh both sites.
+  revalidatePath("/admin");
+  revalidatePath("/");
+  return { error: null };
+}
+
+/**
+ * Mark a booking as refunded. Used both standalone (a refund the admin issues)
+ * and by the manual-booking override when it displaces a paid customer. Keeps
+ * the row as a record (badged "Refunded"), frees its dates (refunded is an
+ * inactive status), and drops it out of revenue (analytics count verified only).
+ * Restores accessory stock if the booking was verified.
+ */
+export async function markBookingRefunded(id: string): Promise<ActionResult> {
+  const supabase = await createClient();
+
+  const status = await currentStatus(supabase, id);
+  if (status === null) return { error: "That booking no longer exists." };
+  if (status === "refunded") return { error: null }; // already done
+
+  const { error } = await supabase
+    .from("bookings")
+    .update({ payment_status: "refunded" })
+    .eq("id", id);
+  if (error) return { error: error.message };
+
+  if (status === "verified") await adjustStockForBooking(supabase, id, 1);
+
   revalidatePath("/admin");
   revalidatePath("/");
   return { error: null };

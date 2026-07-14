@@ -89,6 +89,7 @@ export type Database = {
           end_date: string | null
           fitting_date: string | null
           fitting_time: string | null
+          hold_expires_at: string | null
           id: string
           id_photo_url: string | null
           manual: boolean
@@ -113,6 +114,7 @@ export type Database = {
           end_date?: string | null
           fitting_date?: string | null
           fitting_time?: string | null
+          hold_expires_at?: string | null
           id?: string
           id_photo_url?: string | null
           manual?: boolean
@@ -137,6 +139,7 @@ export type Database = {
           end_date?: string | null
           fitting_date?: string | null
           fitting_time?: string | null
+          hold_expires_at?: string | null
           id?: string
           id_photo_url?: string | null
           manual?: boolean
@@ -395,10 +398,33 @@ export type Database = {
       }
     }
     Functions: {
+      attach_rent_payment: {
+        Args: {
+          p_booking_id: string
+          p_payment_method: string
+          p_proof_path: string
+        }
+        Returns: Json
+      }
       clear_booking_files: {
         Args: { booking_id: string; clear_id: boolean; clear_proof: boolean }
         Returns: undefined
       }
+      create_rent_hold: {
+        Args: {
+          p_accessory_ids: string[]
+          p_address: string
+          p_booking_id: string
+          p_contact: string
+          p_date: string
+          p_deliver_time: string
+          p_dress_id: string
+          p_id_path: string
+          p_name: string
+        }
+        Returns: Json
+      }
+      get_hold_status: { Args: { p_booking_id: string }; Returns: Json }
       list_invalid_expired_pii: {
         Args: { grace_days: number }
         Returns: {
@@ -407,6 +433,11 @@ export type Database = {
           proof_url: string
         }[]
       }
+      purge_expired_holds: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
+      }
+      release_rent_hold: { Args: { p_booking_id: string }; Returns: undefined }
       verify_cron_secret: { Args: { candidate: string }; Returns: boolean }
     }
     Enums: {

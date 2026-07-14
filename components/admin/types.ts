@@ -72,10 +72,12 @@ export type AdminBooking = {
   end: string | null;
   deliver: string | null;
   amount: number;
-  /** 'none' | 'pending' | 'verified' | 'invalid'. */
+  /** 'none' | 'pending' | 'verified' | 'invalid' | 'refunded'. */
   status: string;
   /** Admin-entered (FB/IG/TikTok/walk-in) — no proof; payment set directly. */
   manual: boolean;
+  /** When the booking was made (ISO timestamp) — shown as "Booked …". */
+  bookedAt: string | null;
   /** Signed URL of the payment screenshot, or null if none was uploaded. */
   proofUrl: string | null;
 };
