@@ -30,6 +30,13 @@ function FieldLabel({
 const inputClass =
   "min-h-tap w-full rounded-sm border border-border-soft bg-white px-4 py-2 text-body-base text-text-primary outline-none placeholder:text-text-secondary focus:border-border-accent focus:shadow-focus";
 
+/** How a clashing booking's status reads in the override confirm. */
+function conflictStatusLabel(status: string): string {
+  if (status === "hold") return "being held (unpaid)";
+  if (status === "verified") return "booked & paid";
+  return "reserved (awaiting payment)";
+}
+
 /** A dress the admin can book manually. */
 export type ManualBookingDressOption = {
   id: string;
@@ -70,6 +77,13 @@ export function ManualBookingModal({
   const [paid, setPaid] = useState(true);
 
   const [error, setError] = useState<string | null>(null);
+  // Set when the chosen dates clash with a customer booking — prompts the
+  // admin to confirm the override before we displace anyone.
+  const [conflict, setConflict] = useState<{
+    renter: string;
+    status: string;
+    count: number;
+  } | null>(null);
   const [isPending, startTransition] = useTransition();
 
   // The chosen dress's days-with-a-customer (start..end of every active
@@ -120,7 +134,7 @@ export function ManualBookingModal({
   const canSave =
     dressId !== "" && renterName.trim().length > 0 && selStart !== null;
 
-  function handleSave() {
+  function submit(override: boolean) {
     if (!selStart) return;
     setError(null);
     startTransition(async () => {
@@ -130,7 +144,13 @@ export function ManualBookingModal({
         startDate: selStart,
         endDate: selEnd ?? selStart,
         paid,
+        override,
       });
+      // A clash the admin hasn't confirmed yet — ask before displacing.
+      if (res.conflict && !override) {
+        setConflict(res.conflict);
+        return;
+      }
       if (res.error) {
         setError(res.error);
         return;
@@ -138,6 +158,11 @@ export function ManualBookingModal({
       onClose();
       router.refresh();
     });
+  }
+
+  function handleSave() {
+    setConflict(null);
+    submit(false);
   }
 
   return (
@@ -231,11 +256,52 @@ export function ManualBookingModal({
                 <p className="text-body-sm text-state-error">{error}</p>
               ) : null}
 
+              {/* Override confirm — admins outrank customers, but we make the
+                  displacement explicit (a paid customer becomes a Refunded
+                  record; settle the refund with them off-app). */}
+              {conflict ? (
+                <div className="flex flex-col gap-2.5 rounded-md border border-state-error bg-background-panel p-3.5">
+                  <p className="text-body-sm text-text-primary">
+                    These dates are {conflictStatusLabel(conflict.status)} by{" "}
+                    <b>{conflict.renter}</b>
+                    {conflict.count > 1
+                      ? ` and ${conflict.count - 1} other booking${
+                          conflict.count - 1 > 1 ? "s" : ""
+                        }`
+                      : ""}
+                    . Overriding will displace{" "}
+                    {conflict.count > 1 ? "them" : "their booking"} — a paid one
+                    is kept as a <b>Refunded</b> record.
+                  </p>
+                  <div className="flex gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConflict(null);
+                        submit(true);
+                      }}
+                      disabled={isPending}
+                      className="min-h-tap rounded-pill bg-state-error px-4 text-label-sm uppercase tracking-wide text-text-on-primary transition-colors disabled:opacity-60"
+                    >
+                      {isPending ? "Overriding…" : "Override & book"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setConflict(null)}
+                      disabled={isPending}
+                      className="min-h-tap rounded-pill border border-border-soft bg-white px-4 text-label-sm uppercase tracking-wide text-text-primary transition-colors hover:bg-background-card disabled:opacity-60"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
               {/* Save */}
               <button
                 type="button"
                 onClick={handleSave}
-                disabled={!canSave || isPending}
+                disabled={!canSave || isPending || conflict !== null}
                 className="min-h-tap rounded-pill bg-brand-primary px-5 text-label-base uppercase tracking-label text-text-on-primary transition-colors hover:bg-brand-primary-hover disabled:opacity-50 focus-visible:shadow-focus"
               >
                 {isPending ? "Booking…" : "Add booking"}
