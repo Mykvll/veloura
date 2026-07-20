@@ -110,7 +110,8 @@ export function BookingCalendar({
     for (const r of rentals) {
       if (!r.start || !r.end) continue;
       for (const d of eachDay(r.start, r.end)) slot(d).rents.push(r);
-      slot(addDays(r.end, 1)).wash.push(r);
+      // Logged historical rentals have no wash day; real bookings block end + 1.
+      if (!r.logged) slot(addDays(r.end, 1)).wash.push(r);
     }
     for (const f of fittings) {
       if (f.date) slot(f.date).fittings.push(f);

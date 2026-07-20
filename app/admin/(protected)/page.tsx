@@ -290,13 +290,10 @@ export default async function AdminDashboardPage() {
   }
 
   // ---- Calendar data --------------------------------------------------------
-  // Rentals drive the calendar's rented / wash days; the component itself
-  // expands each into its start..end + wash day. We build from `allBookings`
-  // (not `bookingRows`) on purpose: `bookingRows` drops COMPLETED rentals once
-  // their wash day is past, but the calendar is a history view too — admin pages
-  // back to see who rented what. Using allBookings keeps past rentals visible on
-  // their dates while future/active behaviour is unchanged.
-  const calendarRentals: CalendarRental[] = allBookings
+  // Build from `allBookings`, not `bookingRows`: the latter drops COMPLETED
+  // rentals, but the calendar is a history view too — admin pages back to see
+  // past rentals. The component expands each into its start..end + wash day.
+  const bookingCalendarRentals: CalendarRental[] = allBookings
     .filter((b) => (b.status === "pending" || b.status === "verified") && b.start && b.end)
     .map((b) => ({
       id: b.id,
@@ -306,6 +303,25 @@ export default async function AdminDashboardPage() {
       end: b.end as string,
       deliver: b.deliver,
     }));
+
+  // Logged pre-system rentals (rental_history) are past rentals too. `logged`
+  // marks them historical so the calendar shows their days but no wash day.
+  const loggedCalendarRentals: CalendarRental[] = (pastRentals ?? [])
+    .filter((h) => h.start_date && h.end_date)
+    .map((h) => ({
+      id: h.id,
+      dress: h.dress_name ?? "Dress",
+      renter: h.renter_name,
+      start: h.start_date,
+      end: h.end_date,
+      deliver: null,
+      logged: true,
+    }));
+
+  const calendarRentals: CalendarRental[] = [
+    ...bookingCalendarRentals,
+    ...loggedCalendarRentals,
+  ];
 
   const calendarFittings: CalendarFitting[] = (fittingRows ?? []).map((f) => ({
     id: f.id,

@@ -160,6 +160,8 @@ export type CalendarRental = {
   end: string;
   /** Preferred delivery time, e.g. "10:00 AM" (shown on the pick-up day). */
   deliver: string | null;
+  /** Logged pre-system rental (rental_history): render rented days but no wash day. */
+  logged?: boolean;
 };
 
 /**
