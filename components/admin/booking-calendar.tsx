@@ -68,8 +68,9 @@ type DayAgenda = {
  * "return by" date), and wash-day notes. Page months with ‹ / › and jump back
  * to the current month.
  *
- * Data comes in already scoped to ACTIVE bookings (pending|verified) — the same
- * set that blocks dates — so the calendar always agrees with availability.
+ * Rentals come in scoped to pending|verified bookings — the set that blocks
+ * dates — INCLUDING completed ones whose wash day has passed, so paging back
+ * shows past rentals on their dates. Future/active days still match availability.
  */
 export function BookingCalendar({
   rentals,
@@ -298,7 +299,7 @@ export function BookingCalendar({
                     <div>
                       <b className="text-text-primary">
                         {r.dress} · rented out
-                        {isPickup ? ` · deliver ${r.deliver}` : ""}
+                        {isPickup && r.deliver ? ` · deliver ${r.deliver}` : ""}
                       </b>
                       <div className="text-text-secondary">
                         {r.renter} · {niceDate(r.start)} – {niceDate(r.end)}

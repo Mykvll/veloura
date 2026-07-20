@@ -290,9 +290,13 @@ export default async function AdminDashboardPage() {
   }
 
   // ---- Calendar data --------------------------------------------------------
-  // Active rentals (pending|verified with dates) drive the calendar's rented /
-  // wash days; the component itself expands each into its start..end + wash day.
-  const calendarRentals: CalendarRental[] = bookingRows
+  // Rentals drive the calendar's rented / wash days; the component itself
+  // expands each into its start..end + wash day. We build from `allBookings`
+  // (not `bookingRows`) on purpose: `bookingRows` drops COMPLETED rentals once
+  // their wash day is past, but the calendar is a history view too — admin pages
+  // back to see who rented what. Using allBookings keeps past rentals visible on
+  // their dates while future/active behaviour is unchanged.
+  const calendarRentals: CalendarRental[] = allBookings
     .filter((b) => (b.status === "pending" || b.status === "verified") && b.start && b.end)
     .map((b) => ({
       id: b.id,
