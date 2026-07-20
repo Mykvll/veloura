@@ -5,7 +5,13 @@ import { createClient } from "@/lib/supabase/client";
 import { AccessoryPicker, type CustomerAccessory } from "../accessory-picker";
 import { createRentHold } from "@/app/reserve-actions";
 import { saveHold } from "@/lib/hold-storage";
-import { DELIVERY_TIMES, niceDate } from "@/lib/reserve";
+import {
+  DELIVERY_TIMES,
+  niceDate,
+  lastWearDay,
+  returnDay,
+  RETURN_BY,
+} from "@/lib/reserve";
 
 /** What the rent form hands to the payment step once the hold is created: the
  *  booking id + the server-anchored expiry that drives the payment countdown,
@@ -249,8 +255,8 @@ export function RentForm({
       ) : null}
 
       <div>
-        <FieldLabel required hint="rental countdown starts on delivery">
-          Preferred time to deliver
+        <FieldLabel required hint="so we know when to expect the courier">
+          Expected delivery arrival
         </FieldLabel>
         <select
           className={inputClass}
@@ -264,6 +270,14 @@ export function RentForm({
             <option key={t}>{t}</option>
           ))}
         </select>
+        {/* Delivery time above is informational; it never changes these dates. */}
+        {date ? (
+          <p className="mt-1.5 text-body-sm text-text-secondary">
+            2-day rental: {niceDate(date)} – {niceDate(lastWearDay(date))}. Return
+            before <b className="text-text-primary">{RETURN_BY}</b> on{" "}
+            {niceDate(returnDay(date))}.
+          </p>
+        ) : null}
       </div>
 
       <p className="text-body-sm text-text-secondary">

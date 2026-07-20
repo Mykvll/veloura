@@ -37,6 +37,23 @@ export function niceDate(iso: string): string {
   });
 }
 
+/**
+ * Rental period — a FIXED 2-day wear window (`start`, `start + 1`), not an
+ * hourly countdown. The dress is returned before RETURN_BY on `start + 2`, which
+ * doubles as the cleaning day. Delivery time never affects these dates.
+ */
+export const RENTAL_DAYS = 2;
+/** Return cut-off on the return day (`start + 2`). */
+export const RETURN_BY = "11:00 AM";
+/** The last day the dress is worn — `start + 1`. */
+export function lastWearDay(startIso: string): string {
+  return addDays(startIso, RENTAL_DAYS - 1);
+}
+/** The return / cleaning day — `start + 2`; reserved, not a wear day. */
+export function returnDay(startIso: string): string {
+  return addDays(startIso, RENTAL_DAYS);
+}
+
 /** Delivery windows offered in the rent form. */
 export const DELIVERY_TIMES = [
   "9:00 AM",

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { lastWearDay, returnDay, RETURN_BY } from "@/lib/reserve";
 
 /**
  * One blocked day for one dress, sourced from the `blocked_dates` view.
@@ -41,8 +42,9 @@ function niceDate(iso: string) {
  * with ‹ / › and a "Jump to today" shortcut. Which days are pickable depends
  * on the mode:
  *
- *  - RENT: only days when THIS dress is blocked (its rental + wash day) are
+ *  - RENT: only days when THIS dress is blocked (its 2 wear days + return day) are
  *    disabled. Shows only THIS dress's availability, not other dresses.
+ *    Wear days are highlighted solid gold; the return day is lighter/dashed.
  *  - FITTING: any day when ANY dress is blocked is disabled — a fitting can't
  *    share a day with a rental hand-off.
  *
@@ -103,6 +105,12 @@ export function AvailabilityCalendar({
     }
     return { anyBlocked, thisBlocked, namesByDay };
   }, [blocked, dressId]);
+
+  // Wear days are `selected` and `selected + 1`; `selected + 2` is the return day.
+  const secondWearDayKey =
+    mode === "rent" && selected ? lastWearDay(selected) : null;
+  const returnDayKey =
+    mode === "rent" && selected ? returnDay(selected) : null;
 
   const first = new Date(year, month, 1);
   const startDay = first.getDay(); // 0 = Sunday
@@ -176,7 +184,24 @@ export function AvailabilityCalendar({
           // RENT: only THIS dress's days block; FITTING: any booked day blocks.
           const blockedDay =
             mode === "fitting" ? rentedOut : thisBlocked.has(key);
-          const disabled = blockedDay || isPast;
+          // A rental occupies 3 days (start, start+1, return), so a start date is
+          // only offerable if start+1 and start+2 are also free — mirrors the DB
+          // exclusion constraint. (FITTING picks a single day.)
+          const spanTaken =
+            mode === "rent" && !blockedDay
+              ? [1, 2].some((n) => {
+                  const d = new Date(key + "T00:00:00");
+                  d.setDate(d.getDate() + n);
+                  return thisBlocked.has(
+                    dayKey(d.getFullYear(), d.getMonth(), d.getDate()),
+                  );
+                })
+              : false;
+          const disabled = blockedDay || isPast || spanTaken;
+
+          const isSecondWearDay = key === secondWearDayKey;
+          const isReturnDay = key === returnDayKey;
+          const onPanel = isSel || isSecondWearDay || isReturnDay || rentedOut;
 
           return (
             <button
@@ -187,23 +212,33 @@ export function AvailabilityCalendar({
               className={`flex min-h-[46px] flex-col items-center gap-[3px] rounded-sm border px-0.5 py-1 text-body-sm transition-fast disabled:cursor-not-allowed ${
                 isSel
                   ? "border-border-accent shadow-focus"
-                  : isToday
-                    ? "border-border-strong"
-                    : "border-transparent"
-              } ${rentedOut ? "bg-background-panel" : "bg-white"} ${
+                  : isSecondWearDay
+                    ? "border-border-accent"
+                    : isReturnDay
+                      ? "border-dashed border-border-accent"
+                      : isToday
+                        ? "border-border-strong"
+                        : "border-transparent"
+              } ${onPanel ? "bg-background-panel" : "bg-white"} ${
                 disabled ? "opacity-40" : ""
               }`}
             >
               <span
-                className={`${isSel || isToday ? "font-semibold" : ""} ${
-                  isToday ? "text-text-accent" : "text-text-primary"
-                } ${blockedDay ? "line-through" : ""}`}
+                className={`${
+                  isSel || isSecondWearDay || isToday ? "font-semibold" : ""
+                } ${isToday ? "text-text-accent" : "text-text-primary"} ${
+                  blockedDay ? "line-through" : ""
+                }`}
               >
                 {d}
               </span>
-              {/* Red dot marks any day with a booking (matches the legend). */}
-              <span className="flex h-1.5 gap-[3px]">
-                {rentedOut ? (
+              {/* Booked day → red dot; return day → a "return" tag instead. */}
+              <span className="flex h-1.5 items-center gap-[3px]">
+                {isReturnDay ? (
+                  <span className="text-[9px] uppercase leading-none tracking-[0.06em] text-text-secondary">
+                    return
+                  </span>
+                ) : rentedOut ? (
                   <span className="h-1.5 w-1.5 rounded-full bg-state-error" />
                 ) : null}
               </span>
@@ -220,15 +255,24 @@ export function AvailabilityCalendar({
         </span>
       </div>
 
-      {/* Selected-day detail: whether this specific dress is available. */}
+      {/* Selected-day detail. In RENT mode this spells out the 2-day span and
+          the 11 AM return; in FITTING mode it reports the day's availability. */}
       {selected ? (
         <div className="mt-2.5 rounded-md bg-background-panel p-3 text-body-sm">
           <b className="text-label-sm uppercase tracking-label text-text-heading">
             {niceDate(selected)}
           </b>
           <div className="mt-1 text-text-secondary">
-            {selectedNames.includes(dressName) ? (
-              <div>{dressName} is being rented out or being cleaned on this date.</div>
+            {mode === "rent" && secondWearDayKey && returnDayKey ? (
+              <div>
+                {dressName} is yours {niceDate(selected)} –{" "}
+                {niceDate(secondWearDayKey)} (2-day rental) · return before{" "}
+                {RETURN_BY} on {niceDate(returnDayKey)}.
+              </div>
+            ) : selectedNames.includes(dressName) ? (
+              <div>
+                {dressName} is being rented out or being cleaned on this date.
+              </div>
             ) : (
               <div>{dressName} is available on this date.</div>
             )}
