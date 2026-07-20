@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/supabase/require-admin";
 import { addDays } from "@/lib/reserve";
 
 type ActionResult = { error: string | null };
@@ -110,6 +111,8 @@ export async function createManualBooking(
   input: ManualBookingInput,
 ): Promise<ManualBookingResult> {
   const supabase = await createClient();
+  const denied = await requireAdmin(supabase);
+  if (denied) return denied;
 
   const renterName = input.renterName.trim();
   if (!renterName) return { error: "Please enter the renter's name." };
@@ -223,6 +226,8 @@ export async function createManualBooking(
  */
 export async function markBookingRefunded(id: string): Promise<ActionResult> {
   const supabase = await createClient();
+  const denied = await requireAdmin(supabase);
+  if (denied) return denied;
 
   const status = await currentStatus(supabase, id);
   if (status === null) return { error: "That booking no longer exists." };
@@ -247,6 +252,8 @@ export async function markBookingRefunded(id: string): Promise<ActionResult> {
  */
 export async function verifyBooking(id: string): Promise<ActionResult> {
   const supabase = await createClient();
+  const denied = await requireAdmin(supabase);
+  if (denied) return denied;
 
   const status = await currentStatus(supabase, id);
   if (status === null) return { error: "That booking no longer exists." };
@@ -272,6 +279,8 @@ export async function verifyBooking(id: string): Promise<ActionResult> {
  */
 export async function flagBookingInvalid(id: string): Promise<ActionResult> {
   const supabase = await createClient();
+  const denied = await requireAdmin(supabase);
+  if (denied) return denied;
 
   const status = await currentStatus(supabase, id);
   if (status === null) return { error: "That booking no longer exists." };
@@ -297,6 +306,8 @@ export async function flagBookingInvalid(id: string): Promise<ActionResult> {
  */
 export async function deleteBooking(id: string): Promise<ActionResult> {
   const supabase = await createClient();
+  const denied = await requireAdmin(supabase);
+  if (denied) return denied;
 
   // Read status + the private-bucket file paths in one go, BEFORE the row is
   // gone — once deleted we can no longer learn which files belonged to it.

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/supabase/require-admin";
 
 /**
  * The data the payment-method editor sends us to save.
@@ -36,6 +37,8 @@ export async function savePaymentMethod(
   input: PaymentMethodInput,
 ): Promise<ActionResult> {
   const supabase = await createClient();
+  const denied = await requireAdmin(supabase);
+  if (denied) return denied;
 
   const name = input.name.trim();
   if (!name) return { error: "Please give the payment type a name." };
@@ -63,6 +66,8 @@ export async function savePaymentMethod(
  */
 export async function deletePaymentMethod(id: string): Promise<ActionResult> {
   const supabase = await createClient();
+  const denied = await requireAdmin(supabase);
+  if (denied) return denied;
 
   const { error } = await supabase.from("payment_methods").delete().eq("id", id);
   if (error) return { error: error.message };

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/supabase/require-admin";
 
 /**
  * The data the dress editor sends us to save.
@@ -46,6 +47,8 @@ type ActionResult = { error: string | null };
  */
 export async function saveDress(input: DressInput): Promise<ActionResult> {
   const supabase = await createClient();
+  const denied = await requireAdmin(supabase);
+  if (denied) return denied;
 
   const name = input.name.trim();
   if (!name) return { error: "Please give the dress a name." };
@@ -125,6 +128,8 @@ export async function saveDress(input: DressInput): Promise<ActionResult> {
  */
 export async function deleteDress(id: string): Promise<ActionResult> {
   const supabase = await createClient();
+  const denied = await requireAdmin(supabase);
+  if (denied) return denied;
 
   const { error } = await supabase.from("dresses").delete().eq("id", id);
   if (error) return { error: error.message };

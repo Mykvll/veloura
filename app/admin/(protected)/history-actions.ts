@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/supabase/require-admin";
 
 /**
  * The data the "Log past rental" modal sends us to save.
@@ -43,6 +44,8 @@ export async function logPastRental(
   input: PastRentalInput,
 ): Promise<ActionResult> {
   const supabase = await createClient();
+  const denied = await requireAdmin(supabase);
+  if (denied) return denied;
 
   const renterName = input.renterName.trim();
   if (!renterName) return { error: "Please enter the renter's name." };
@@ -94,6 +97,8 @@ export async function logPastRental(
  */
 export async function removePastRental(id: string): Promise<ActionResult> {
   const supabase = await createClient();
+  const denied = await requireAdmin(supabase);
+  if (denied) return denied;
 
   const { error } = await supabase.from("rental_history").delete().eq("id", id);
   if (error) return { error: error.message };
@@ -127,6 +132,12 @@ export async function fetchHistoryPage(
   hasMore: boolean;
 }> {
   const supabase = await createClient();
+  // Defense in depth (audit 5a). This action returns data rather than an
+  // ActionResult, so an unauthenticated caller is refused by throwing — the
+  // history table exposes renter PII, which anon must never read.
+  const denied = await requireAdmin(supabase);
+  if (denied) throw new Error(denied.error);
+
   const today = new Date().toISOString().split("T")[0];
 
   // Completed bookings (verified + wash day in past).
