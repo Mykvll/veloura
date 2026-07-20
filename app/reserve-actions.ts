@@ -7,6 +7,27 @@ import { fittingSlots, FITTING_FEE, PARKING_FEE } from "@/lib/reserve";
 type ActionResult = { error: string | null };
 
 /**
+ * WHY WE VALIDATE THE UPLOAD PATH SHAPE
+ * -------------------------------------
+ * The browser uploads the customer's ID and payment proof to the private
+ * `payment-proofs` bucket under a fixed shape — "ids/<uuid>.<ext>" and
+ * "proofs/<uuid>.<ext>" (see rent-form.tsx / payment-step.tsx) — and hands the
+ * resulting storage PATH to these actions to store on the booking. But that
+ * path is just a client-supplied string, and the anon key is public, so a
+ * direct caller could pass any value (e.g. another customer's file, or a path
+ * outside the upload folders). We reject anything that isn't the expected
+ * prefix + a randomUUID + a short image extension, so a booking can't be made
+ * to point at an arbitrary storage object.
+ */
+function isValidUploadPath(prefix: "ids" | "proofs", path: string): boolean {
+  // crypto.randomUUID() → 8-4-4-4-12 lowercase hex; the client lowercases the ext.
+  const re = new RegExp(
+    `^${prefix}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.[a-z0-9]{1,5}$`,
+  );
+  return re.test(path);
+}
+
+/**
  * WHY THE HOLD IS TWO-PHASE (and why these are RPCs)
  * --------------------------------------------------
  * A rent reservation now HOLDS its dates the moment the customer commits to
@@ -71,7 +92,9 @@ export async function createRentHold(
   }
   if (!input.date) return { error: "Please pick a rental date." };
   if (!input.deliverTime) return { error: "Please choose a delivery time." };
-  if (!input.idPath) return { error: "Please upload a valid ID." };
+  if (!input.idPath || !isValidUploadPath("ids", input.idPath)) {
+    return { error: "Please upload a valid ID." };
+  }
 
   const { data, error } = await supabase.rpc("create_rent_hold", {
     p_booking_id: input.bookingId,
@@ -144,7 +167,9 @@ export async function attachRentPayment(
   const supabase = await createClient();
 
   if (!paymentMethod) return { error: "Please choose a payment option." };
-  if (!proofPath) return { error: "Please upload your payment proof." };
+  if (!proofPath || !isValidUploadPath("proofs", proofPath)) {
+    return { error: "Please upload your payment proof." };
+  }
 
   const { data, error } = await supabase.rpc("attach_rent_payment", {
     p_booking_id: bookingId,
