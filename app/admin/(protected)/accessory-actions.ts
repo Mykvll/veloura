@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/supabase/require-admin";
 
 /**
  * The data the accessory editor sends us to save.
@@ -39,6 +40,8 @@ export async function saveAccessory(
   input: AccessoryInput,
 ): Promise<ActionResult> {
   const supabase = await createClient();
+  const denied = await requireAdmin(supabase);
+  if (denied) return denied;
 
   const name = input.name.trim();
   if (!name) return { error: "Please give the accessory a name." };
@@ -68,6 +71,8 @@ export async function saveAccessory(
  */
 export async function deleteAccessory(id: string): Promise<ActionResult> {
   const supabase = await createClient();
+  const denied = await requireAdmin(supabase);
+  if (denied) return denied;
 
   const { error } = await supabase.from("accessories").delete().eq("id", id);
   if (error) return { error: error.message };
