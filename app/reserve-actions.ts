@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { fittingSlots, FITTING_FEE, PARKING_FEE } from "@/lib/reserve";
+import { fittingSlots } from "@/lib/reserve";
 
 type ActionResult = { error: string | null };
 
@@ -239,57 +239,38 @@ export async function createFittingBooking(
     return { error: "Please enter your plate number for parking." };
   }
 
-  const { data: dress, error: dressErr } = await supabase
-    .from("dresses")
-    .select("id, name")
-    .eq("id", input.dressId)
-    .single();
-  if (dressErr || !dress) {
-    return { error: "That dress is no longer available." };
-  }
-
-  // Re-check 1: a fitting can't share a day with any rental hand-off, so the
-  // date must not be blocked for ANY dress (business rule / FITTING calendar).
-  const { data: dayClash, error: dayErr } = await supabase
-    .from("blocked_dates")
-    .select("blocked_day")
-    .eq("blocked_day", input.date)
-    .limit(1);
-  if (dayErr) return { error: "Couldn't confirm the date. Please try again." };
-  if (dayClash && dayClash.length > 0) {
-    return { error: "Sorry — that day is no longer open for fittings." };
-  }
-
-  // Re-check 2: the specific time slot must still be free.
-  const { data: slotClash, error: slotErr } = await supabase
-    .from("booked_fitting_slots")
-    .select("fitting_time")
-    .eq("fitting_date", input.date)
-    .eq("fitting_time", input.time)
-    .limit(1);
-  if (slotErr) return { error: "Couldn't confirm the time. Please try again." };
-  if (slotClash && slotClash.length > 0) {
-    return {
-      error: "Sorry — that time was just booked. Please pick another slot.",
-    };
-  }
-
-  const { error: insErr } = await supabase.from("bookings").insert({
-    type: "fitting",
-    payment_status: "pending",
-    renter_name: name,
-    contact,
-    dress_id: dress.id,
-    dress_name: dress.name, // snapshot
-    fitting_date: input.date,
-    fitting_time: input.time,
-    parking: input.parking,
-    vehicle: input.parking ? (input.vehicle ?? "Car") : null,
-    plate: input.parking ? plate : null,
-    amount: FITTING_FEE + (input.parking ? PARKING_FEE : 0),
+  // The availability re-checks (blocked_dates day + booked_fitting_slots) and
+  // the insert happen atomically inside create_fitting_booking, a SECURITY
+  // DEFINER RPC — same reasoning as the rent RPCs above: it closes the old
+  // check-then-insert race, snapshots the amount server-side, and lets us drop
+  // the anon INSERT policy on bookings (audit §2). Anon has no direct write.
+  const { data, error } = await supabase.rpc("create_fitting_booking", {
+    p_dress_id: input.dressId,
+    p_name: name,
+    p_contact: contact,
+    p_date: input.date,
+    p_time: input.time,
+    p_parking: input.parking,
+    p_vehicle: input.vehicle ?? "", // RPC treats "" as the default ("Car")
+    p_plate: plate,
   });
-  if (insErr) {
-    return { error: "Couldn't book your fitting. Please try again." };
+  if (error) return { error: "Couldn't book your fitting. Please try again." };
+
+  const res = data as { ok: boolean; conflict?: "day" | "slot"; error?: string };
+  if (!res.ok) {
+    if (res.conflict === "day") {
+      return { error: "Sorry — that day is no longer open for fittings." };
+    }
+    if (res.conflict === "slot") {
+      return {
+        error: "Sorry — that time was just booked. Please pick another slot.",
+      };
+    }
+    if (res.error === "dress_gone") {
+      return { error: "That dress is no longer available." };
+    }
+    // Field problems (the UI enforces these too).
+    return { error: "Please check your details and try again." };
   }
 
   // A new pending fitting occupies its slot — refresh so the page reflects it.

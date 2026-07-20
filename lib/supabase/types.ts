@@ -410,6 +410,19 @@ export type Database = {
         Args: { booking_id: string; clear_id: boolean; clear_proof: boolean }
         Returns: undefined
       }
+      create_fitting_booking: {
+        Args: {
+          p_contact: string
+          p_date: string
+          p_dress_id: string
+          p_name: string
+          p_parking: boolean
+          p_plate: string
+          p_time: string
+          p_vehicle: string
+        }
+        Returns: Json
+      }
       create_rent_hold: {
         Args: {
           p_accessory_ids: string[]
