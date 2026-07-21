@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Dialog } from "radix-ui";
 import { createClient } from "@/lib/supabase/client";
 import { saveAccessory } from "@/app/admin/(protected)/accessory-actions";
-import { accAvail } from "@/lib/accessories";
 import type { AdminAccessory } from "./types";
 
 /* Small brand-token field primitives, mirroring the dress editor. */
@@ -121,10 +120,11 @@ export function AccessoryEditorModal({
   // Sensible starting values for a blank accessory.
   const [price, setPrice] = useState<number>(accessory?.price ?? 80);
   const [cost, setCost] = useState<number>(accessory?.cost ?? 200);
-  // Per-unit inventory: total owned, out on rent, and pulled from service.
-  // rented + unavailableUnits are kept ≤ stock by the stepper handlers below.
+  // Per-unit inventory: total owned + units pulled from service (editable).
+  // "Out on rent" is NOT edited here — it's derived from actual bookings by
+  // date; `accessory.rented` is a read-only TODAY count passed in for display.
   const [stock, setStock] = useState<number>(accessory?.stock ?? 1);
-  const [rented, setRented] = useState<number>(accessory?.rented ?? 0);
+  const rentedToday = accessory?.rented ?? 0;
   const [unavailableUnits, setUnavailableUnits] = useState<number>(
     accessory?.unavailableUnits ?? 0,
   );
@@ -175,7 +175,6 @@ export function AccessoryEditorModal({
         price,
         cost,
         stock,
-        rented,
         unavailableUnits,
         imageUrl,
       });
@@ -306,9 +305,9 @@ export function AccessoryEditorModal({
               </div>
             </div>
 
-            {/* Inventory — three counters. Owned is the total; the other two
-                track where those units are. rented + unavailableUnits are
-                clamped to never exceed owned, so "Available to rent" stays sane. */}
+            {/* Inventory — two editable counters (owned + pulled from service).
+                "Out on rent" is derived per date from real bookings, so it's a
+                read-only TODAY count, not a stepper. */}
             <div>
               <FieldLabel required hint="track how many units are where">
                 Inventory
@@ -319,26 +318,13 @@ export function AccessoryEditorModal({
                   hint="total pieces you have"
                   value={stock}
                   onDec={() => {
-                    // Drop a unit off the top, trimming the buckets that no
-                    // longer fit: unavailable first, then rented.
+                    // Drop a unit off the top, trimming `unavailable` if it no
+                    // longer fits so "Available to rent" stays sane.
                     const owned = Math.max(0, stock - 1);
-                    const unavail = Math.min(unavailableUnits, owned);
-                    const out = Math.min(rented, owned - unavail);
                     setStock(owned);
-                    setUnavailableUnits(unavail);
-                    setRented(out);
+                    setUnavailableUnits(Math.min(unavailableUnits, owned));
                   }}
                   onInc={() => setStock(stock + 1)}
-                />
-                <Stepper
-                  label="Out on rent"
-                  hint="with customers now — will return"
-                  value={rented}
-                  labelColor="text-brand-secondary"
-                  onDec={() => setRented(Math.max(0, rented - 1))}
-                  onInc={() =>
-                    setRented(Math.min(stock - unavailableUnits, rented + 1))
-                  }
                 />
                 <Stepper
                   label="Unavailable"
@@ -349,28 +335,33 @@ export function AccessoryEditorModal({
                     setUnavailableUnits(Math.max(0, unavailableUnits - 1))
                   }
                   onInc={() =>
-                    setUnavailableUnits(
-                      Math.min(stock - rented, unavailableUnits + 1),
-                    )
+                    setUnavailableUnits(Math.min(stock, unavailableUnits + 1))
                   }
                 />
               </div>
-              <div className="mt-2 text-body-sm text-text-secondary">
-                Available to rent now:{" "}
-                <b
-                  className={
-                    accAvail({ stock, rented, unavailableUnits }) > 0
-                      ? "text-state-success"
-                      : "text-state-error"
-                  }
-                >
-                  {accAvail({ stock, rented, unavailableUnits })}
-                </b>
-                {accAvail({ stock, rented, unavailableUnits }) === 0
-                  ? rented > 0
-                    ? " — all units currently rented out"
-                    : " — currently unavailable"
-                  : ""}
+              <div className="mt-2 flex flex-col gap-1 text-body-sm text-text-secondary">
+                <span>
+                  Out on rent today:{" "}
+                  <b className="text-brand-secondary">{rentedToday}</b>{" "}
+                  <span className="text-text-secondary">
+                    (automatic — from bookings covering today)
+                  </span>
+                </span>
+                <span>
+                  Rentable units (capacity):{" "}
+                  <b
+                    className={
+                      stock - unavailableUnits > 0
+                        ? "text-state-success"
+                        : "text-state-error"
+                    }
+                  >
+                    {Math.max(0, stock - unavailableUnits)}
+                  </b>
+                  {stock - unavailableUnits <= 0
+                    ? " — currently unavailable on every date"
+                    : ""}
+                </span>
               </div>
             </div>
 

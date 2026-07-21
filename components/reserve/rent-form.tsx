@@ -250,6 +250,7 @@ export function RentForm({
             accessories={accessories}
             picked={picked}
             onToggle={toggle}
+            startDate={date}
           />
         </div>
       ) : null}

@@ -1,24 +1,26 @@
 "use client";
 
 import { useState } from "react";
-import { accState } from "@/lib/accessories";
+import { accStateForBooking } from "@/lib/accessories";
 
 /**
  * One accessory as the customer reserve flow needs it. Maps from the
- * `accessories` table: `price` is the rental add-on price, `imageUrl` is the
- * photo in the dress-photos bucket (or null), and stock/rented/unavailableUnits
- * split the units into total owned / out on rent / pulled from service — what's
- * actually bookable is derived with accState() (see lib/accessories.ts).
+ * `accessories` table plus the `accessory_blocked_dates` view: `price` is the
+ * rental add-on price, `imageUrl` is the photo in the dress-photos bucket (or
+ * null), stock/unavailableUnits give the capacity (owned − pulled), and
+ * `blockedDays` are the ISO days this accessory is already fully booked.
+ * Whether it's bookable for the customer's CHOSEN date is derived date-aware
+ * with accStateForBooking() (see lib/accessories.ts).
  */
 export type CustomerAccessory = {
   id: string;
   name: string;
   price: number;
   stock: number;
-  /** Units out with other customers now (temporary; they return). */
-  rented: number;
   /** Units pulled from service — damaged, lost, or in repair (not rentable). */
   unavailableUnits: number;
+  /** ISO "YYYY-MM-DD" days this accessory is at capacity (fully booked). */
+  blockedDays: string[];
   imageUrl: string | null;
 };
 
@@ -36,10 +38,14 @@ export function AccessoryPicker({
   accessories,
   picked,
   onToggle,
+  startDate,
 }: {
   accessories: CustomerAccessory[];
   picked: string[];
   onToggle: (id: string) => void;
+  /** Rental start date chosen on the calendar (null until one is picked) —
+   *  availability is judged against the days that rental would occupy. */
+  startDate: string | null;
 }) {
   // Which accessory's full image is open in the lightbox (null = closed).
   const [preview, setPreview] = useState<CustomerAccessory | null>(null);
@@ -47,10 +53,10 @@ export function AccessoryPicker({
   return (
     <div className="flex flex-col gap-2">
       {accessories.map((a) => {
-        // Two out-of-stock reasons read differently to the customer: fully
-        // booked-out-but-returning ("Rented out") vs. nothing to rent at all
-        // ("Currently unavailable"). Both disable the row.
-        const st = accState(a);
+        // Date-aware: "Rented out" means booked on THESE dates (free on others);
+        // "Currently unavailable" means pulled from service / none owned. Both
+        // disable the row.
+        const st = accStateForBooking(a, a.blockedDays, startDate);
         const out = st.code !== "available";
         const sel = picked.includes(a.id);
         const statusLabel =

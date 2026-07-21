@@ -72,16 +72,33 @@ export default async function Home() {
   // fetch them all. Oldest-first keeps the order stable as new ones are added.
   const { data: accessoryRows } = await supabase
     .from("accessories")
-    .select("id, name, price, stock, rented, unavailable_units, image_url")
+    .select("id, name, price, stock, unavailable_units, image_url")
     .order("created_at", { ascending: true });
+
+  // Per-accessory days that are already fully booked, from the
+  // `accessory_blocked_dates` view (the accessory analogue of `blocked_dates`).
+  // The picker judges the customer's chosen rental date against these, so an
+  // accessory booked for one set of dates stays available on non-overlapping
+  // ones (date-aware — see lib/accessories.ts accStateForBooking).
+  const { data: accBlockedRows } = await supabase
+    .from("accessory_blocked_dates")
+    .select("accessory_id, blocked_day");
+
+  const blockedByAccessory = new Map<string, string[]>();
+  for (const r of accBlockedRows ?? []) {
+    if (!r.accessory_id || !r.blocked_day) continue; // view cols are nullable
+    const list = blockedByAccessory.get(r.accessory_id) ?? [];
+    list.push(r.blocked_day);
+    blockedByAccessory.set(r.accessory_id, list);
+  }
 
   const accessories: CustomerAccessory[] = (accessoryRows ?? []).map((a) => ({
     id: a.id,
     name: a.name,
     price: a.price,
     stock: a.stock,
-    rented: a.rented ?? 0,
     unavailableUnits: a.unavailable_units ?? 0,
+    blockedDays: blockedByAccessory.get(a.id) ?? [],
     imageUrl: a.image_url,
   }));
 

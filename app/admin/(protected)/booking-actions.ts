@@ -42,51 +42,18 @@ type Supabase = Awaited<ReturnType<typeof createClient>>;
 /**
  * BOOKINGS & PAYMENTS — admin actions (admin.html → BookingsSection).
  *
- * The admin verifies payment proofs, flags fakes, or deletes a booking. All
- * three run on the server as the logged-in admin (the "admin manage/delete
- * bookings" RLS policies), and all three keep accessory STOCK in sync — the one
- * piece of real logic here.
+ * The admin verifies payment proofs, flags fakes, or deletes a booking. All run
+ * on the server as the logged-in admin (the "admin manage/delete bookings" RLS
+ * policies).
  *
- * STOCK RULE (business rule 2): an accessory unit is "out" for the whole life of
- * an ACTIVE booking — payment_status in {hold, pending, verified}. The unit is
- * reserved the moment a customer HOLDS (create_rent_hold increments
- * accessories.rented; see supabase/accessory-hold.sql), NOT at verify. So verify
- * changes nothing here, and the admin side only ever needs to FREE units — when
- * a booking leaves the active set (invalid / refunded / deleted, or a hold the
- * manual-override displaces). `stock` now means units OWNED and is never touched
- * by the booking flow.
+ * ACCESSORY STOCK (business rule 2): there is NOTHING to keep in sync here.
+ * Accessory availability is DATE-AWARE and DERIVED from the bookings themselves
+ * (the `accessory_blocked_dates` view — an accessory is only "out" on the days
+ * its active bookings cover). So creating, verifying, refunding, flagging, or
+ * deleting a booking changes availability automatically via the booking rows;
+ * no counter to increment or free. `stock` = units owned; `unavailable_units` =
+ * units pulled from service (both admin-set); "out on rent today" is derived.
  */
-
-/** The payment statuses during which an accessory unit is reserved (`rented`). */
-const ACTIVE_HOLDING = ["hold", "pending", "verified"] as const;
-
-/**
- * Free the accessory units a booking reserved: subtract 1 from each linked
- * accessory's `rented` (clamped at 0). Call this ONLY when a booking leaves the
- * active-holding set, and — for deletes — BEFORE the row is removed, since
- * booking_accessories cascades away with it. Fetch-then-write per accessory (the
- * same pragmatic, tiny-race approach the reserve flow uses; fine at this volume).
- */
-async function freeAccessoriesForBooking(supabase: Supabase, bookingId: string) {
-  const { data: links } = await supabase
-    .from("booking_accessories")
-    .select("accessory_id")
-    .eq("booking_id", bookingId);
-
-  for (const link of links ?? []) {
-    if (!link.accessory_id) continue; // accessory deleted (link set null) — nothing to free
-    const { data: acc } = await supabase
-      .from("accessories")
-      .select("rented")
-      .eq("id", link.accessory_id)
-      .single();
-    if (!acc) continue;
-    await supabase
-      .from("accessories")
-      .update({ rented: Math.max(0, (acc.rented ?? 0) - 1) })
-      .eq("id", link.accessory_id);
-  }
-}
 
 /** Read a booking's current payment status (or null if it's gone). */
 async function currentStatus(
@@ -180,9 +147,8 @@ export async function createManualBooking(
   // paid/awaiting ones become `refunded` (kept as a record; the admin settles
   // the refund off-app).
   for (const b of clashes) {
-    // Every clash is active (hold/pending/verified), so each had accessory units
-    // reserved — free them BEFORE the delete (links cascade) or the refund.
-    await freeAccessoriesForBooking(supabase, b.id);
+    // Displacing a booking frees its dates (and thus its accessories, which are
+    // date-derived) automatically — nothing extra to adjust.
     if (b.payment_status === "hold") {
       await supabase.from("bookings").delete().eq("id", b.id);
     } else {
@@ -237,11 +203,6 @@ export async function markBookingRefunded(id: string): Promise<ActionResult> {
   if (status === null) return { error: "That booking no longer exists." };
   if (status === "refunded") return { error: null }; // already done
 
-  // Free units before flipping status (a refunded booking no longer holds them).
-  if (ACTIVE_HOLDING.includes(status as (typeof ACTIVE_HOLDING)[number])) {
-    await freeAccessoriesForBooking(supabase, id);
-  }
-
   const { error } = await supabase
     .from("bookings")
     .update({ payment_status: "refunded" })
@@ -291,11 +252,6 @@ export async function flagBookingInvalid(id: string): Promise<ActionResult> {
   const status = await currentStatus(supabase, id);
   if (status === null) return { error: "That booking no longer exists." };
 
-  // Free units before flipping status (an invalid booking no longer holds them).
-  if (ACTIVE_HOLDING.includes(status as (typeof ACTIVE_HOLDING)[number])) {
-    await freeAccessoriesForBooking(supabase, id);
-  }
-
   const { error } = await supabase
     .from("bookings")
     .update({ payment_status: "invalid" })
@@ -308,32 +264,24 @@ export async function flagBookingInvalid(id: string): Promise<ActionResult> {
 }
 
 /**
- * Delete a booking. This frees its dates automatically — `blocked_dates` only
- * counts rows that still exist, so once the row is gone the calendar reopens
- * those days. If the booking was still active, free its accessory units BEFORE
- * deleting, since the `booking_accessories` links cascade away with the row.
+ * Delete a booking. This frees its dates automatically — `blocked_dates` (and
+ * the accessory equivalent, `accessory_blocked_dates`) only count rows that
+ * still exist, so once the row is gone the calendar and any accessories it held
+ * reopen on those days. No accessory bookkeeping needed.
  */
 export async function deleteBooking(id: string): Promise<ActionResult> {
   const supabase = await createClient();
   const denied = await requireAdmin(supabase);
   if (denied) return denied;
 
-  // Read status + the private-bucket file paths in one go, BEFORE the row is
-  // gone — once deleted we can no longer learn which files belonged to it.
+  // Read the private-bucket file paths BEFORE the row is gone — once deleted we
+  // can no longer learn which files belonged to it.
   const { data: booking } = await supabase
     .from("bookings")
-    .select("payment_status, id_photo_url, proof_url")
+    .select("id_photo_url, proof_url")
     .eq("id", id)
     .single();
   if (!booking) return { error: null }; // already gone
-
-  if (
-    ACTIVE_HOLDING.includes(
-      booking.payment_status as (typeof ACTIVE_HOLDING)[number],
-    )
-  ) {
-    await freeAccessoriesForBooking(supabase, id);
-  }
 
   const { error } = await supabase.from("bookings").delete().eq("id", id);
   if (error) return { error: error.message };

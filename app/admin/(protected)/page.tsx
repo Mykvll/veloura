@@ -102,11 +102,26 @@ export default async function AdminDashboardPage() {
   }
 
   // Accessories for the second section (newest first, same as the old
-  // /admin/accessories page which is now folded in here).
+  // /admin/accessories page which is now folded in here). `rented` is no longer
+  // stored — it's derived below as "units out on rent TODAY".
   const { data: accessories, error: accessoriesError } = await supabase
     .from("accessories")
-    .select("id, name, price, cost, stock, rented, unavailable_units, image_url")
+    .select("id, name, price, cost, stock, unavailable_units, image_url")
     .order("created_at", { ascending: false });
+
+  // "Out on rent today" per accessory (units_out): how many active bookings
+  // (unexpired hold / pending / verified rentals) are holding each accessory on
+  // a range that covers today. This is the date-aware replacement for the old
+  // stored `rented` count — the admin readouts ("N out on rent", analytics)
+  // show a truthful today-snapshot without any manual field.
+  const { data: outTodayRows } = await supabase
+    .from("accessory_rented_today")
+    .select("accessory_id, units_out");
+  const rentedTodayByAccessory = new Map<string, number>();
+  for (const r of outTodayRows ?? []) {
+    if (!r.accessory_id) continue; // view col is nullable
+    rentedTodayByAccessory.set(r.accessory_id, r.units_out ?? 0);
+  }
 
   // Payment channels for the third section. Ordered the same way the customer
   // picker shows them (sort_order, then creation order) so admin + customer
@@ -196,7 +211,7 @@ export default async function AdminDashboardPage() {
     price: a.price,
     cost: a.cost ?? 0,
     stock: a.stock,
-    rented: a.rented ?? 0,
+    rented: rentedTodayByAccessory.get(a.id) ?? 0, // derived: out on rent today
     unavailableUnits: a.unavailable_units ?? 0,
     imageUrl: a.image_url,
   }));

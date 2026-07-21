@@ -371,6 +371,36 @@ export type Database = {
       }
     }
     Views: {
+      accessory_blocked_dates: {
+        Row: {
+          accessory_id: string | null
+          blocked_day: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_accessories_accessory_id_fkey"
+            columns: ["accessory_id"]
+            isOneToOne: false
+            referencedRelation: "accessories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      accessory_rented_today: {
+        Row: {
+          accessory_id: string | null
+          units_out: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_accessories_accessory_id_fkey"
+            columns: ["accessory_id"]
+            isOneToOne: false
+            referencedRelation: "accessories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       blocked_dates: {
         Row: {
           blocked_day: string | null
