@@ -123,6 +123,21 @@ export default async function AdminDashboardPage() {
     rentedTodayByAccessory.set(r.accessory_id, r.units_out ?? 0);
   }
 
+  // The days each accessory is already fully booked — the SAME view the customer
+  // picker reads. The admin needs it for two things: the "is it free on…?" date
+  // check in the accessories grid, and the date-aware add-on picker in the
+  // manual-booking modal (so a walk-in can't be given an accessory that's out).
+  const { data: accBlockedRows } = await supabase
+    .from("accessory_blocked_dates")
+    .select("accessory_id, blocked_day");
+  const blockedDaysByAccessory = new Map<string, string[]>();
+  for (const r of accBlockedRows ?? []) {
+    if (!r.accessory_id || !r.blocked_day) continue; // view cols are nullable
+    const list = blockedDaysByAccessory.get(r.accessory_id) ?? [];
+    list.push(r.blocked_day);
+    blockedDaysByAccessory.set(r.accessory_id, list);
+  }
+
   // Payment channels for the third section. Ordered the same way the customer
   // picker shows them (sort_order, then creation order) so admin + customer
   // agree on the list.
@@ -214,6 +229,19 @@ export default async function AdminDashboardPage() {
     rented: rentedTodayByAccessory.get(a.id) ?? 0, // derived: out on rent today
     unavailableUnits: a.unavailable_units ?? 0,
     imageUrl: a.image_url,
+    blockedDays: blockedDaysByAccessory.get(a.id) ?? [],
+  }));
+
+  // The add-on options for the manual-booking modal — same rows, trimmed to what
+  // the picker needs (availability is worked out client-side from blockedDays
+  // against the range the admin picks).
+  const manualAccessoryOptions = accessoryRows.map((a) => ({
+    id: a.id,
+    name: a.name,
+    price: a.price,
+    stock: a.stock,
+    unavailableUnits: a.unavailableUnits,
+    blockedDays: a.blockedDays,
   }));
 
   // Shape payment-method rows for the Payments section.
@@ -227,6 +255,25 @@ export default async function AdminDashboardPage() {
   // admin) we mint a short-lived SIGNED URL for each proof: a link with a
   // time-limited token baked in that lets the admin's browser load just that one
   // file for the next hour, without ever making the bucket public.
+  // Which add-ons go out with each rental — the hand-over checklist shown on
+  // every booking card. Names come from the joined accessory (null if it was
+  // deleted; the link's price_at_booking still keeps analytics honest).
+  const accessoryNamesByBooking = new Map<string, string[]>();
+  const rentalIds = (rentalRows ?? []).map((b) => b.id);
+  if (rentalIds.length > 0) {
+    const { data: bookingAccRows } = await supabase
+      .from("booking_accessories")
+      .select("booking_id, accessories(name)")
+      .in("booking_id", rentalIds);
+    for (const r of bookingAccRows ?? []) {
+      const name = (r.accessories as { name: string } | null)?.name;
+      if (!r.booking_id || !name) continue;
+      const list = accessoryNamesByBooking.get(r.booking_id) ?? [];
+      list.push(name);
+      accessoryNamesByBooking.set(r.booking_id, list);
+    }
+  }
+
   const allBookings: AdminBooking[] = await Promise.all(
     (rentalRows ?? []).map(async (b) => {
       let proofUrl: string | null = null;
@@ -250,6 +297,7 @@ export default async function AdminDashboardPage() {
         manual: b.manual,
         bookedAt: b.created_at,
         proofUrl,
+        accessories: accessoryNamesByBooking.get(b.id) ?? [],
       };
     }),
   );
@@ -438,7 +486,11 @@ export default async function AdminDashboardPage() {
 
       <section id="bookings" className="scroll-mt-24">
         {/* historyDressOptions doubles as the manual-booking dress picker. */}
-        <BookingsManager bookings={bookingRows} dresses={historyDressOptions} />
+        <BookingsManager
+          bookings={bookingRows}
+          dresses={historyDressOptions}
+          accessories={manualAccessoryOptions}
+        />
       </section>
 
       <section id="dresses" className="scroll-mt-24">

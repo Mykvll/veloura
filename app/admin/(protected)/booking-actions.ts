@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/supabase/require-admin";
 import { addDays } from "@/lib/reserve";
+import { accessoryOccupiedRange } from "@/lib/accessories";
 
 type ActionResult = { error: string | null };
 
@@ -26,6 +27,10 @@ export type ManualBookingInput = {
   paid: boolean;
   /** Set once the admin confirms displacing a clashing customer booking. */
   override?: boolean;
+  /** Accessory ids going out with this rental. Recorded as booking_accessories
+   *  so a walk-in's add-ons block those accessories for customers on these
+   *  dates, exactly like an app booking does. */
+  accessoryIds?: string[];
 };
 
 export type ManualBookingResult = {
@@ -54,6 +59,90 @@ type Supabase = Awaited<ReturnType<typeof createClient>>;
  * no counter to increment or free. `stock` = units owned; `unavailable_units` =
  * units pulled from service (both admin-set); "out on rent today" is derived.
  */
+
+/**
+ * DATE-AWARE accessory guard for a manual booking over `start`..`end`.
+ *
+ * The admin side needs the same rule the customer side gets from
+ * create_rent_hold: an accessory can go out on these dates only if a unit is
+ * still free ON THOSE DAYS. For each chosen accessory we count how many ACTIVE
+ * bookings already hold it on each day the new booking would occupy (rental
+ * days + the wash day, via accessoryOccupiedRange); if any single day is
+ * already at capacity (stock − unavailable_units) the accessory can't go out.
+ *
+ * `excludeBookingIds` are the bookings an override is about to displace — they
+ * release their accessories, so they must not count against the new booking.
+ *
+ * Computed here in TS rather than in SQL: this mirrors the existing dress clash
+ * check in createManualBooking and carries the same check-then-insert caveat,
+ * which is fine for a single admin at this volume.
+ *
+ * Returns the NAME of the first accessory that can't go out, or null if all are
+ * free.
+ */
+async function accessoryClashForRange(
+  supabase: Supabase,
+  accessoryIds: string[],
+  start: string,
+  end: string,
+  excludeBookingIds: string[],
+): Promise<string | null> {
+  if (accessoryIds.length === 0) return null;
+
+  const { data: accRows } = await supabase
+    .from("accessories")
+    .select("id, name, stock, unavailable_units")
+    .in("id", accessoryIds);
+  if (!accRows || accRows.length === 0) return null;
+
+  // Every active booking that holds one of these accessories, with its dates.
+  const { data: links } = await supabase
+    .from("booking_accessories")
+    .select(
+      "accessory_id, bookings!inner(id, start_date, end_date, type, payment_status, hold_expires_at)",
+    )
+    .in("accessory_id", accessoryIds);
+
+  const now = Date.now();
+  const excluded = new Set(excludeBookingIds);
+  // Flatten to (accessoryId → the set of days each active holder occupies).
+  const holdersByAccessory = new Map<string, string[][]>();
+  for (const l of links ?? []) {
+    const b = l.bookings as unknown as {
+      id: string;
+      start_date: string | null;
+      end_date: string | null;
+      type: string;
+      payment_status: string;
+      hold_expires_at: string | null;
+    } | null;
+    if (!b || !l.accessory_id) continue;
+    if (b.type !== "rent" || !b.start_date || !b.end_date) continue;
+    if (excluded.has(b.id)) continue;
+    const active =
+      b.payment_status === "pending" ||
+      b.payment_status === "verified" ||
+      (b.payment_status === "hold" &&
+        b.hold_expires_at !== null &&
+        new Date(b.hold_expires_at).getTime() > now);
+    if (!active) continue;
+    const list = holdersByAccessory.get(l.accessory_id) ?? [];
+    list.push(accessoryOccupiedRange(b.start_date, b.end_date));
+    holdersByAccessory.set(l.accessory_id, list);
+  }
+
+  const wantedDays = accessoryOccupiedRange(start, end);
+  for (const a of accRows) {
+    const capacity = Math.max(0, a.stock - (a.unavailable_units ?? 0));
+    if (capacity <= 0) return a.name; // every unit pulled from service
+    const holders = holdersByAccessory.get(a.id) ?? [];
+    for (const day of wantedDays) {
+      const used = holders.reduce((n, days) => n + (days.includes(day) ? 1 : 0), 0);
+      if (used >= capacity) return a.name;
+    }
+  }
+  return null;
+}
 
 /** Read a booking's current payment status (or null if it's gone). */
 async function currentStatus(
@@ -159,17 +248,53 @@ export async function createManualBooking(
     }
   }
 
-  const { error } = await supabase.from("bookings").insert({
-    type: "rent",
-    manual: true,
-    payment_status: input.paid ? "verified" : "pending",
-    renter_name: renterName,
-    dress_id: dress.id,
-    dress_name: dress.name, // snapshot
-    start_date: input.startDate,
-    end_date: input.endDate,
-    amount: dress.price,
-  });
+  // Accessories: check AFTER the displacement above, so add-ons freed by an
+  // override are available to this booking. Uses the same date-aware rule the
+  // customer flow gets from create_rent_hold.
+  const accessoryIds = input.accessoryIds ?? [];
+  if (accessoryIds.length > 0) {
+    const clashing = await accessoryClashForRange(
+      supabase,
+      accessoryIds,
+      input.startDate,
+      input.endDate,
+      clashes.map((b) => b.id),
+    );
+    if (clashing) {
+      return {
+        error: `${clashing} isn't available on those dates — it's already out on another booking. Remove it or pick other dates.`,
+      };
+    }
+  }
+
+  // Snapshot the add-on prices like the customer flow: amount = dress + add-ons.
+  const { data: pickedAccessories } =
+    accessoryIds.length > 0
+      ? await supabase
+          .from("accessories")
+          .select("id, price")
+          .in("id", accessoryIds)
+      : { data: [] as { id: string; price: number }[] };
+  const addOnTotal = (pickedAccessories ?? []).reduce(
+    (sum, a) => sum + (a.price ?? 0),
+    0,
+  );
+
+  const { data: created, error } = await supabase
+    .from("bookings")
+    .insert({
+      type: "rent",
+      manual: true,
+      payment_status: input.paid ? "verified" : "pending",
+      renter_name: renterName,
+      dress_id: dress.id,
+      dress_name: dress.name, // snapshot
+      start_date: input.startDate,
+      end_date: input.endDate,
+      amount: dress.price + addOnTotal,
+    })
+    .select("id")
+    .single();
   if (error) {
     // 23P01 = exclusion_violation: a booking slipped in between our check and
     // insert. Surface it plainly rather than as a raw DB error.
@@ -179,6 +304,29 @@ export async function createManualBooking(
       };
     }
     return { error: error.message };
+  }
+
+  // Link the add-ons, snapshotting today's price (booking_accessories.
+  // price_at_booking) so analytics stay right if the price changes later. These
+  // rows are what make the accessory unavailable to customers on these dates.
+  if (created && (pickedAccessories ?? []).length > 0) {
+    const { error: linkError } = await supabase
+      .from("booking_accessories")
+      .insert(
+        (pickedAccessories ?? []).map((a) => ({
+          booking_id: created.id,
+          accessory_id: a.id,
+          price_at_booking: a.price,
+        })),
+      );
+    if (linkError) {
+      // The booking exists but its add-ons didn't attach — say so plainly rather
+      // than reporting success, since availability would be wrong.
+      return {
+        error:
+          "The booking was saved, but its accessories couldn't be attached. Please edit the booking and re-add them.",
+      };
+    }
   }
 
   // The new booking blocks its dates for customers too — refresh both sites.

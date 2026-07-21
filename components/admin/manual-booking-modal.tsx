@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog } from "radix-ui";
 import { addDays } from "@/lib/reserve";
+import { accStateForRange } from "@/lib/accessories";
 import { createManualBooking } from "@/app/admin/(protected)/booking-actions";
 import { ManualBookingCalendar } from "./manual-booking-calendar";
 import type { AdminBooking } from "./types";
@@ -41,6 +42,23 @@ function conflictStatusLabel(status: string): string {
 export type ManualBookingDressOption = {
   id: string;
   name: string;
+  /** Rental price — the booking's amount is this plus any add-ons. */
+  price: number;
+};
+
+/**
+ * An accessory the admin can send out with a manual booking. `blockedDays` is
+ * this accessory's at-capacity days from the `accessory_blocked_dates` view —
+ * the same source the customer picker uses — so the admin sees exactly the same
+ * date-aware availability a customer would.
+ */
+export type ManualBookingAccessoryOption = {
+  id: string;
+  name: string;
+  price: number;
+  stock: number;
+  unavailableUnits: number;
+  blockedDays: string[];
 };
 
 /**
@@ -61,10 +79,12 @@ export type ManualBookingDressOption = {
  */
 export function ManualBookingModal({
   dresses,
+  accessories,
   bookings,
   onClose,
 }: {
   dresses: ManualBookingDressOption[];
+  accessories: ManualBookingAccessoryOption[];
   bookings: AdminBooking[];
   onClose: () => void;
 }) {
@@ -75,6 +95,7 @@ export function ManualBookingModal({
   const [selStart, setSelStart] = useState<string | null>(null);
   const [selEnd, setSelEnd] = useState<string | null>(null);
   const [paid, setPaid] = useState(true);
+  const [picked, setPicked] = useState<string[]>([]);
 
   const [error, setError] = useState<string | null>(null);
   // Set when the chosen dates clash with a customer booking — prompts the
@@ -131,8 +152,45 @@ export function ManualBookingModal({
     setSelEnd(null);
   }
 
+  // Date-aware add-on availability for the CHOSEN range (rental days + wash
+  // day), read from the same accessory_blocked_dates data the customer picker
+  // uses. Before a range is picked everything reads as available.
+  const accessoryState = useMemo(() => {
+    const m = new Map<string, ReturnType<typeof accStateForRange>>();
+    for (const a of accessories) {
+      m.set(
+        a.id,
+        accStateForRange(a, a.blockedDays, selStart, selEnd ?? selStart),
+      );
+    }
+    return m;
+  }, [accessories, selStart, selEnd]);
+
+  // Add-ons the admin picked that the CURRENT range has since made unavailable
+  // (e.g. they changed the dates after ticking). We never silently drop one —
+  // saving is blocked until the admin removes it.
+  const pickedUnavailable = picked.filter(
+    (id) => accessoryState.get(id)?.code !== "available",
+  );
+
+  const dressPrice = dresses.find((d) => d.id === dressId)?.price ?? 0;
+  const addOnTotal = picked.reduce(
+    (sum, id) => sum + (accessories.find((a) => a.id === id)?.price ?? 0),
+    0,
+  );
+
+  function toggleAccessory(id: string) {
+    setError(null);
+    setPicked((p) =>
+      p.includes(id) ? p.filter((x) => x !== id) : [...p, id],
+    );
+  }
+
   const canSave =
-    dressId !== "" && renterName.trim().length > 0 && selStart !== null;
+    dressId !== "" &&
+    renterName.trim().length > 0 &&
+    selStart !== null &&
+    pickedUnavailable.length === 0;
 
   function submit(override: boolean) {
     if (!selStart) return;
@@ -145,6 +203,7 @@ export function ManualBookingModal({
         endDate: selEnd ?? selStart,
         paid,
         override,
+        accessoryIds: picked,
       });
       // A clash the admin hasn't confirmed yet — ask before displacing.
       if (res.conflict && !override) {
@@ -246,10 +305,88 @@ export function ManualBookingModal({
                 </select>
               </div>
 
+              {/* Add-ons — date-aware, exactly like the customer picker. Ticking
+                  one records a booking_accessories row, which is what makes the
+                  accessory unavailable to customers on these dates. */}
+              {accessories.length > 0 ? (
+                <div>
+                  <FieldLabel>Accessories going out</FieldLabel>
+                  <div className="flex flex-col gap-1.5">
+                    {accessories.map((a) => {
+                      const st = accessoryState.get(a.id);
+                      const out = st?.code !== "available";
+                      const sel = picked.includes(a.id);
+                      // A picked add-on the current dates made unavailable is
+                      // still tappable, so the admin can untick it.
+                      const mustRemove = sel && out;
+                      return (
+                        <button
+                          key={a.id}
+                          type="button"
+                          onClick={() => (!out || sel) && toggleAccessory(a.id)}
+                          disabled={out && !sel}
+                          className={`flex min-h-tap items-center gap-3 rounded-sm border px-3 py-2 text-left transition-fast disabled:cursor-not-allowed disabled:opacity-55 ${
+                            mustRemove
+                              ? "border-state-error bg-background-panel"
+                              : sel
+                                ? "border-border-accent bg-background-panel"
+                                : "border-border-soft bg-white hover:border-border-strong"
+                          }`}
+                        >
+                          <span
+                            className={`flex h-5 w-5 flex-none items-center justify-center rounded-[5px] border text-xs leading-none text-text-on-primary ${
+                              sel
+                                ? "border-brand-primary bg-brand-primary"
+                                : "border-border-strong bg-white"
+                            }`}
+                          >
+                            {sel ? "✓" : ""}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-body-sm text-text-primary">
+                              {a.name}
+                            </span>
+                            <span
+                              className={`text-body-sm ${
+                                out ? "text-state-error" : "text-text-secondary"
+                              }`}
+                            >
+                              {!selStart
+                                ? "pick dates to check"
+                                : st?.code === "available"
+                                  ? `${st.avail} available`
+                                  : st?.code === "rented"
+                                    ? "Out on these dates"
+                                    : "Currently unavailable"}
+                            </span>
+                          </span>
+                          <span className="flex-none text-price-base text-text-accent">
+                            +₱{a.price}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {pickedUnavailable.length > 0 ? (
+                    <p className="mt-1.5 text-body-sm text-state-error">
+                      Remove the add-ons marked in red — they&apos;re already out
+                      on these dates.
+                    </p>
+                  ) : null}
+                  {picked.length > 0 && pickedUnavailable.length === 0 ? (
+                    <p className="mt-1.5 text-body-sm text-text-secondary">
+                      Booking total: ₱{dressPrice + addOnTotal} (₱{dressPrice}{" "}
+                      dress + ₱{addOnTotal} add-ons)
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+
               {/* What a manual booking does. */}
               <p className="rounded-md bg-background-panel px-4 py-3 text-body-sm text-text-secondary">
                 Manual bookings block calendar dates and add a wash day, just
-                like app bookings.
+                like app bookings. Any accessories you tick are held for these
+                dates too.
               </p>
 
               {error ? (

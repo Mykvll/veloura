@@ -21,6 +21,7 @@ import { SectionTitle } from "@/components/section-title";
 import {
   ManualBookingModal,
   type ManualBookingDressOption,
+  type ManualBookingAccessoryOption,
 } from "./manual-booking-modal";
 import type { AdminBooking } from "./types";
 
@@ -89,10 +90,13 @@ function bookedLabel(iso: string | null): string | null {
 export function BookingsManager({
   bookings,
   dresses,
+  accessories,
 }: {
   bookings: AdminBooking[];
   /** The catalogue, for the Add-manual-booking modal's dress picker. */
   dresses: ManualBookingDressOption[];
+  /** Add-ons (with their at-capacity days) for the manual-booking picker. */
+  accessories: ManualBookingAccessoryOption[];
 }) {
   const router = useRouter();
   // The proof shown full-size in the lightbox, the card mid-delete-confirm, and
@@ -210,6 +214,23 @@ export function BookingsManager({
                       </span>
                     ) : null}
                   </div>
+                  {/* Add-ons going out with this rental — the hand-over
+                      checklist. These also hold the accessory for these dates. */}
+                  {b.accessories.length > 0 ? (
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                      <span className="text-label-sm uppercase tracking-label text-text-secondary">
+                        Add-ons:
+                      </span>
+                      {b.accessories.map((name) => (
+                        <span
+                          key={name}
+                          className="rounded-pill bg-background-panel px-2.5 py-0.5 text-body-sm text-text-primary"
+                        >
+                          {name}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                   {b.bookedAt ? (
                     <div className="mt-1 text-body-sm text-text-secondary">
                       Booked {bookedLabel(b.bookedAt)}
@@ -345,6 +366,7 @@ export function BookingsManager({
       {adding ? (
         <ManualBookingModal
           dresses={dresses}
+          accessories={accessories}
           bookings={bookings}
           onClose={() => setAdding(false)}
         />

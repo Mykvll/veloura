@@ -45,6 +45,9 @@ export type AdminAccessory = {
   unavailableUnits: number;
   /** Public URL of the image in the dress-photos bucket, or null. */
   imageUrl: string | null;
+  /** Days this accessory is already fully booked (from accessory_blocked_dates)
+   *  — lets the admin check availability for a future date, not just today. */
+  blockedDays: string[];
 };
 
 /**
@@ -86,6 +89,9 @@ export type AdminBooking = {
   bookedAt: string | null;
   /** Signed URL of the payment screenshot, or null if none was uploaded. */
   proofUrl: string | null;
+  /** Names of the add-ons going out with this rental (from booking_accessories),
+   *  so the admin has a hand-over checklist. Empty when there are none. */
+  accessories: string[];
 };
 
 /**

@@ -38,6 +38,10 @@ export function AccessoriesManager({
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  // Optional "is it free on…?" date. Empty = show today's snapshot (the default
+  // readout). Set = show whether each accessory is fully booked THAT day, read
+  // from the same accessory_blocked_dates data the customer picker uses.
+  const [checkDate, setCheckDate] = useState("");
 
   function handleDelete(id: string) {
     setError(null);
@@ -65,6 +69,34 @@ export function AccessoriesManager({
         </span>
       </div>
 
+      {/* "Free on…?" check. Availability is date-scoped (an accessory out next
+          weekend is free today), so the default badges are a TODAY snapshot and
+          this lets the admin ask about any other day. */}
+      <div className="mt-4 flex flex-wrap items-center justify-center gap-2.5">
+        <label
+          htmlFor="acc-check-date"
+          className="text-label-sm uppercase tracking-label text-text-heading"
+        >
+          Check availability on
+        </label>
+        <input
+          id="acc-check-date"
+          type="date"
+          value={checkDate}
+          onChange={(e) => setCheckDate(e.target.value)}
+          className="min-h-tap rounded-sm border border-border-soft bg-white px-3 py-1.5 text-body-sm text-text-primary outline-none focus:border-border-accent focus:shadow-focus"
+        />
+        {checkDate ? (
+          <button
+            type="button"
+            onClick={() => setCheckDate("")}
+            className="min-h-tap rounded-pill border border-border-soft bg-white px-3 text-label-sm uppercase tracking-label text-text-secondary hover:border-border-strong"
+          >
+            Show today
+          </button>
+        ) : null}
+      </div>
+
       {error ? (
         <p className="mt-4 text-body-sm text-state-error">{error}</p>
       ) : null}
@@ -75,16 +107,32 @@ export function AccessoriesManager({
           const avail = accAvail(a);
           const { rented, unavailableUnits } = a;
           const low = avail > 0 && avail <= 2;
-          // Main badge — what's rentable now: green when available, gold when
-          // low (≤2), red when none can be rented (reserved tone).
-          const mainToneClass =
-            avail > 0
+          // Capacity is what the shop can rent on ANY day; a day is "full" when
+          // it appears in this accessory's blocked days.
+          const capacity = Math.max(0, a.stock - unavailableUnits);
+          const fullThatDay = checkDate
+            ? a.blockedDays.includes(checkDate)
+            : false;
+          const dateFree = checkDate ? capacity > 0 && !fullThatDay : false;
+
+          // Main badge — with a date chosen it answers "free THAT day?"; with no
+          // date it's the today snapshot (green available / gold low / red none).
+          const mainToneClass = checkDate
+            ? dateFree
+              ? "bg-state-success text-text-on-primary"
+              : "bg-state-error text-text-on-primary"
+            : avail > 0
               ? low
                 ? "bg-brand-primary text-text-on-primary"
                 : "bg-state-success text-text-on-primary"
               : "bg-state-error text-text-on-primary";
-          const mainLabel =
-            avail > 0
+          const mainLabel = checkDate
+            ? dateFree
+              ? `Free on ${checkDate}`
+              : capacity <= 0
+                ? "Unavailable"
+                : `Fully booked ${checkDate}`
+            : avail > 0
               ? `${avail} available`
               : rented > 0
                 ? "Rented out"
