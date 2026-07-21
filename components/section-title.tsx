@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 
 /**
- * Centered display-serif section title with thin gold rules and ✦ sparkles.
+ * Centered Marcellus section title with thin gold rules and ✦ sparkles.
+ * Marcellus (font-section) is used HERE and nowhere else — the rest of the
+ * type system stays on Cormorant Garamond (font-display).
  * Used by every stacked section on the customer one-pager AND the admin page.
  *
  * Anatomy: gold hairline · ✦ TITLE ✦ · gold hairline, with an optional
@@ -19,7 +21,7 @@ export function SectionTitle({
     <div className="text-center">
       <div className="flex items-center justify-center gap-4">
         <span className="h-px max-w-[90px] flex-1 bg-brand-primary" aria-hidden />
-        <h2 className="flex items-center gap-3 font-display text-display-lg uppercase tracking-display text-text-accent">
+        <h2 className="flex items-center gap-3 font-section text-display-lg uppercase tracking-display text-text-accent">
           <span className="text-sm" aria-hidden>
             ✦
           </span>

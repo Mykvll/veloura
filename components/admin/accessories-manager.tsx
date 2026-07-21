@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AccessoryEditorModal } from "./accessory-editor-modal";
 import { deleteAccessory } from "@/app/admin/(protected)/accessory-actions";
@@ -11,6 +11,15 @@ import type { AdminAccessory } from "./types";
 // Shared capsule shape for the stock badges, matching the rest of the admin UI.
 const pill =
   "inline-flex items-center whitespace-nowrap rounded-pill px-2 py-0.5 text-label-sm uppercase tracking-label";
+
+/** "Jul 22, 2026" — short enough to sit inline in a badge or caption. */
+function shortDate(iso: string) {
+  return new Date(iso + "T00:00:00").toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
 /** Peso formatter, matching the rest of the admin UI. */
 function peso(n: number) {
@@ -38,10 +47,27 @@ export function AccessoriesManager({
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  // Optional "is it free on…?" date. Empty = show today's snapshot (the default
-  // readout). Set = show whether each accessory is fully booked THAT day, read
-  // from the same accessory_blocked_dates data the customer picker uses.
+  // The "is it free on…?" date, which the field itself displays — it starts on
+  // today, so the admin can always see which day the badges describe.
+  //
+  // Both bits of state start empty and are filled in after mount rather than
+  // during render: the server renders in UTC and the admin's browser is on
+  // Manila time, so a render-time `new Date()` can disagree across the date
+  // line and trip a hydration mismatch. The first paint shows an empty field,
+  // which reads the same as today's snapshot anyway.
   const [checkDate, setCheckDate] = useState("");
+  const [today, setToday] = useState("");
+  useEffect(() => {
+    // "en-CA" gives YYYY-MM-DD in the browser's own timezone.
+    const iso = new Date().toLocaleDateString("en-CA");
+    setToday(iso);
+    setCheckDate(iso);
+  }, []);
+  // Today is a richer case than any other day: bookings give us a live `rented`
+  // count, so the badges can say "2 available" / "Rented out". For other days
+  // all we know from accessory_blocked_dates is at-capacity or not, so those
+  // badges answer the narrower free / fully-booked question.
+  const showingToday = !checkDate || checkDate === today;
 
   function handleDelete(id: string) {
     setError(null);
@@ -86,13 +112,14 @@ export function AccessoriesManager({
           onChange={(e) => setCheckDate(e.target.value)}
           className="min-h-tap rounded-sm border border-border-soft bg-white px-3 py-1.5 text-body-sm text-text-primary outline-none focus:border-border-accent focus:shadow-focus"
         />
-        {checkDate ? (
+        {/* Only worth showing once the admin has moved off today. */}
+        {today && checkDate !== today ? (
           <button
             type="button"
-            onClick={() => setCheckDate("")}
+            onClick={() => setCheckDate(today)}
             className="min-h-tap rounded-pill border border-border-soft bg-white px-3 text-label-sm uppercase tracking-label text-text-secondary hover:border-border-strong"
           >
-            Show today
+            Today
           </button>
         ) : null}
       </div>
@@ -110,14 +137,12 @@ export function AccessoriesManager({
           // Capacity is what the shop can rent on ANY day; a day is "full" when
           // it appears in this accessory's blocked days.
           const capacity = Math.max(0, a.stock - unavailableUnits);
-          const fullThatDay = checkDate
-            ? a.blockedDays.includes(checkDate)
-            : false;
-          const dateFree = checkDate ? capacity > 0 && !fullThatDay : false;
+          const fullThatDay = a.blockedDays.includes(checkDate);
+          const dateFree = capacity > 0 && !fullThatDay;
 
-          // Main badge — with a date chosen it answers "free THAT day?"; with no
-          // date it's the today snapshot (green available / gold low / red none).
-          const mainToneClass = checkDate
+          // Main badge — on today it's the live snapshot (green available /
+          // gold low / red none); on any other day it answers "free THAT day?".
+          const mainToneClass = !showingToday
             ? dateFree
               ? "bg-state-success text-text-on-primary"
               : "bg-state-error text-text-on-primary"
@@ -126,12 +151,12 @@ export function AccessoriesManager({
                 ? "bg-brand-primary text-text-on-primary"
                 : "bg-state-success text-text-on-primary"
               : "bg-state-error text-text-on-primary";
-          const mainLabel = checkDate
+          const mainLabel = !showingToday
             ? dateFree
-              ? `Free on ${checkDate}`
+              ? `Free ${shortDate(checkDate)}`
               : capacity <= 0
                 ? "Unavailable"
-                : `Fully booked ${checkDate}`
+                : `Fully booked ${shortDate(checkDate)}`
             : avail > 0
               ? `${avail} available`
               : rented > 0

@@ -54,6 +54,9 @@ export default {
         display: ["var(--font-display)", "Georgia", "serif"],
         body: ["var(--font-body)", '"Helvetica Neue"', "sans-serif"],
         script: ["var(--font-script)", "cursive"],
+        // Section titles (the ✦ TITLE ✦ headings) — Marcellus, per the design
+        // project's SectionTitle component.
+        section: ["var(--font-section)", "Georgia", "serif"],
         // Home-page hero tagline only — not part of the general type system.
         "hero-serif": ["var(--font-hero-serif)", "Georgia", "serif"],
         "hero-script": ["var(--font-hero-script)", "cursive"],

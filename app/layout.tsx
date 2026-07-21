@@ -5,6 +5,7 @@ import {
   Alex_Brush,
   Italiana,
   Pinyon_Script,
+  Marcellus,
 } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
@@ -51,6 +52,17 @@ const heroScript = Pinyon_Script({
   display: "swap",
 });
 
+// Section titles (font-section) — the ✦ TITLE ✦ headings on both the customer
+// one-pager and the admin page. Marcellus ships in a single 400 weight; the
+// display-lg token asks for 500, which the browser synthesizes, exactly as the
+// design project's SectionTitle does.
+const section = Marcellus({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-section",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "Veloura by CM",
   description: "Dress rental in Metro Manila",
@@ -75,6 +87,7 @@ export default function RootLayout({
         script.variable,
         heroSerif.variable,
         heroScript.variable,
+        section.variable,
       )}
     >
       <body className="min-h-full flex flex-col">{children}</body>
