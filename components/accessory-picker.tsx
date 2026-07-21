@@ -1,17 +1,24 @@
 "use client";
 
 import { useState } from "react";
+import { accState } from "@/lib/accessories";
 
 /**
  * One accessory as the customer reserve flow needs it. Maps from the
- * `accessories` table: `price` is the rental add-on price, `stock` is how many
- * are left, `imageUrl` is the photo in the dress-photos bucket (or null).
+ * `accessories` table: `price` is the rental add-on price, `imageUrl` is the
+ * photo in the dress-photos bucket (or null), and stock/rented/unavailableUnits
+ * split the units into total owned / out on rent / pulled from service — what's
+ * actually bookable is derived with accState() (see lib/accessories.ts).
  */
 export type CustomerAccessory = {
   id: string;
   name: string;
   price: number;
   stock: number;
+  /** Units out with other customers now (temporary; they return). */
+  rented: number;
+  /** Units pulled from service — damaged, lost, or in repair (not rentable). */
+  unavailableUnits: number;
   imageUrl: string | null;
 };
 
@@ -40,8 +47,25 @@ export function AccessoryPicker({
   return (
     <div className="flex flex-col gap-2">
       {accessories.map((a) => {
-        const out = a.stock <= 0;
+        // Two out-of-stock reasons read differently to the customer: fully
+        // booked-out-but-returning ("Rented out") vs. nothing to rent at all
+        // ("Currently unavailable"). Both disable the row.
+        const st = accState(a);
+        const out = st.code !== "available";
         const sel = picked.includes(a.id);
+        const statusLabel =
+          st.code === "available"
+            ? `${st.avail} available`
+            : st.code === "rented"
+              ? "Rented out"
+              : "Currently unavailable";
+        // muted when available, gold while out-but-returning, red when none.
+        const statusColor =
+          st.code === "available"
+            ? "text-text-secondary"
+            : st.code === "rented"
+              ? "text-text-accent"
+              : "text-state-error";
         return (
           <button
             key={a.id}
@@ -108,12 +132,8 @@ export function AccessoryPicker({
               <span className="block text-body-base text-text-primary">
                 {a.name}
               </span>
-              <span
-                className={`text-body-sm ${
-                  out ? "text-state-error" : "text-text-secondary"
-                }`}
-              >
-                {out ? "Out of stock" : `${a.stock} available`}
+              <span className={`text-body-sm ${statusColor}`}>
+                {statusLabel}
               </span>
             </span>
 

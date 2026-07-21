@@ -5,7 +5,12 @@ import { useRouter } from "next/navigation";
 import { AccessoryEditorModal } from "./accessory-editor-modal";
 import { deleteAccessory } from "@/app/admin/(protected)/accessory-actions";
 import { SectionTitle } from "@/components/section-title";
+import { accAvail } from "@/lib/accessories";
 import type { AdminAccessory } from "./types";
+
+// Shared capsule shape for the stock badges, matching the rest of the admin UI.
+const pill =
+  "inline-flex items-center whitespace-nowrap rounded-pill px-2 py-0.5 text-label-sm uppercase tracking-label";
 
 /** Peso formatter, matching the rest of the admin UI. */
 function peso(n: number) {
@@ -67,14 +72,23 @@ export function AccessoriesManager({
       {/* Grid: accessory cards + the Add tile. */}
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {accessories.map((a) => {
-          const out = a.stock <= 0;
-          const low = a.stock > 0 && a.stock <= 2;
-          // Stock badge: red when out, gold when low (≤2), green otherwise.
-          const badgeClass = out
-            ? "bg-state-error text-text-on-primary"
-            : low
-              ? "bg-brand-primary text-text-on-primary"
-              : "bg-state-success text-text-on-primary";
+          const avail = accAvail(a);
+          const { rented, unavailableUnits } = a;
+          const low = avail > 0 && avail <= 2;
+          // Main badge — what's rentable now: green when available, gold when
+          // low (≤2), red when none can be rented (reserved tone).
+          const mainToneClass =
+            avail > 0
+              ? low
+                ? "bg-brand-primary text-text-on-primary"
+                : "bg-state-success text-text-on-primary"
+              : "bg-state-error text-text-on-primary";
+          const mainLabel =
+            avail > 0
+              ? `${avail} available`
+              : rented > 0
+                ? "Rented out"
+                : "Unavailable";
           return (
             <div
               key={a.id}
@@ -103,15 +117,30 @@ export function AccessoriesManager({
                       +{peso(a.price)}
                     </span>
                   </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-2">
-                    <span
-                      className={`rounded-pill px-2 py-0.5 text-label-sm uppercase tracking-label ${badgeClass}`}
-                    >
-                      {out ? "Out of stock" : `${a.stock} in stock`}
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                    <span className={`${pill} ${mainToneClass}`}>
+                      {mainLabel}
                     </span>
-                    <span className="text-body-sm text-text-secondary">
-                      unit cost {peso(a.cost)}
-                    </span>
+                    {/* Secondary badges name the two out-of-stock reasons:
+                        units out on rent (taupe) and units pulled from service
+                        (outline). Shown only when there are any. */}
+                    {rented > 0 ? (
+                      <span
+                        className={`${pill} bg-brand-secondary text-text-on-primary`}
+                      >
+                        {rented} out on rent
+                      </span>
+                    ) : null}
+                    {unavailableUnits > 0 ? (
+                      <span
+                        className={`${pill} border border-border-accent text-text-accent`}
+                      >
+                        {unavailableUnits} unavailable
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="mt-1.5 text-body-sm text-text-secondary">
+                    {a.stock} owned · unit cost {peso(a.cost)}
                   </div>
                 </div>
               </div>

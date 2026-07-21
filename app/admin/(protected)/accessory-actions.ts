@@ -21,8 +21,12 @@ export type AccessoryInput = {
   price: number;
   /** Your unit cost (pesos). */
   cost: number;
-  /** How many you own. */
+  /** Total units you own. */
   stock: number;
+  /** Units out with customers now (temporary; they return). */
+  rented: number;
+  /** Units pulled from service — damaged, lost, or in repair (not rentable). */
+  unavailableUnits: number;
   imageUrl: string | null;
 };
 
@@ -46,12 +50,26 @@ export async function saveAccessory(
   const name = input.name.trim();
   if (!name) return { error: "Please give the accessory a name." };
 
+  // Clamp the unit counts as a server-side backstop (the editor already keeps
+  // them in range): each ≥ 0, and out-on-rent + unavailable never exceed owned.
+  const stock = Math.max(0, Math.round(input.stock));
+  const unavailableUnits = Math.min(
+    Math.max(0, Math.round(input.unavailableUnits)),
+    stock,
+  );
+  const rented = Math.min(
+    Math.max(0, Math.round(input.rented)),
+    stock - unavailableUnits,
+  );
+
   const { error } = await supabase.from("accessories").upsert({
     id: input.id,
     name,
     price: input.price,
     cost: input.cost,
-    stock: Math.max(0, Math.round(input.stock)),
+    stock,
+    rented,
+    unavailable_units: unavailableUnits,
     image_url: input.imageUrl,
   });
   if (error) return { error: error.message };

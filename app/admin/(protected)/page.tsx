@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { accAvail } from "@/lib/accessories";
 import { AnalyticsSummary } from "@/components/admin/analytics-summary";
 import { DressManager } from "@/components/admin/dress-manager";
 import { AccessoriesManager } from "@/components/admin/accessories-manager";
@@ -104,7 +105,7 @@ export default async function AdminDashboardPage() {
   // /admin/accessories page which is now folded in here).
   const { data: accessories, error: accessoriesError } = await supabase
     .from("accessories")
-    .select("id, name, price, cost, stock, image_url")
+    .select("id, name, price, cost, stock, rented, unavailable_units, image_url")
     .order("created_at", { ascending: false });
 
   // Payment channels for the third section. Ordered the same way the customer
@@ -187,13 +188,16 @@ export default async function AdminDashboardPage() {
     };
   });
 
-  // Shape accessory rows the same way the old accessories page did.
+  // Shape accessory rows the same way the old accessories page did. rented and
+  // unavailable_units default to 0 for rows created before those columns existed.
   const accessoryRows: AdminAccessory[] = (accessories ?? []).map((a) => ({
     id: a.id,
     name: a.name,
     price: a.price,
     cost: a.cost ?? 0,
     stock: a.stock,
+    rented: a.rented ?? 0,
+    unavailableUnits: a.unavailable_units ?? 0,
     imageUrl: a.image_url,
   }));
 
@@ -352,8 +356,18 @@ export default async function AdminDashboardPage() {
     topDressCount,
     dressesLive: rows.filter((d) => d.status === "live").length,
     accessoriesCount: accessoryRows.length,
-    outStock: accessoryRows.filter((a) => a.stock <= 0).length,
-    lowStock: accessoryRows.filter((a) => a.stock > 0 && a.stock <= 2).length,
+    // Un-rentable accessories, split by reason: fully out on rent (coming back)
+    // vs. none available and none on rent (pulled from service / none owned).
+    // "low" still counts the ones you CAN rent but are running short of.
+    rentedOut: accessoryRows.filter(
+      (a) => accAvail(a) === 0 && a.rented > 0,
+    ).length,
+    unavailable: accessoryRows.filter(
+      (a) => accAvail(a) === 0 && a.rented === 0,
+    ).length,
+    lowStock: accessoryRows.filter(
+      (a) => accAvail(a) > 0 && accAvail(a) <= 2,
+    ).length,
     avgPerRental: rentalsCounted
       ? Math.round(totalEarned / rentalsCounted)
       : null,

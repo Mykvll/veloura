@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Dialog } from "radix-ui";
 import { createClient } from "@/lib/supabase/client";
 import { saveAccessory } from "@/app/admin/(protected)/accessory-actions";
+import { accAvail } from "@/lib/accessories";
 import type { AdminAccessory } from "./types";
 
 /* Small brand-token field primitives, mirroring the dress editor. */
@@ -35,6 +36,63 @@ const inputClass =
   "min-h-tap w-full rounded-sm border border-border-soft bg-white px-4 py-2 text-body-base text-text-primary outline-none placeholder:text-text-secondary focus:border-border-accent focus:shadow-focus";
 
 /**
+ * One labelled −/+ counter row for the inventory section. `labelColor` tints
+ * the label to match the design (heading for owned, taupe for on-rent, red for
+ * unavailable). The parent owns the clamping in onDec/onInc.
+ */
+function Stepper({
+  label,
+  hint,
+  value,
+  labelColor = "text-text-heading",
+  onDec,
+  onInc,
+}: {
+  label: string;
+  hint: string;
+  value: number;
+  labelColor?: string;
+  onDec: () => void;
+  onInc: () => void;
+}) {
+  const stepBtn =
+    "flex h-10 w-10 flex-none items-center justify-center rounded-pill border border-border-soft bg-white text-2xl leading-none text-text-accent hover:bg-background-panel";
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-md bg-background-panel px-3.5 py-2.5">
+      <div className="min-w-0">
+        <div
+          className={`text-label-sm uppercase tracking-label ${labelColor}`}
+        >
+          {label}
+        </div>
+        <div className="mt-0.5 text-body-sm text-text-secondary">{hint}</div>
+      </div>
+      <div className="flex flex-none items-center gap-2">
+        <button
+          type="button"
+          aria-label={`Decrease ${label.toLowerCase()}`}
+          onClick={onDec}
+          className={stepBtn}
+        >
+          −
+        </button>
+        <span className="min-w-7 text-center text-price-base text-text-heading">
+          {value}
+        </span>
+        <button
+          type="button"
+          aria-label={`Increase ${label.toLowerCase()}`}
+          onClick={onInc}
+          className={stepBtn}
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Create / edit one accessory in a modal.
  *
  * UPLOAD FLOW (same as the dress editor): the image file never passes through
@@ -63,7 +121,13 @@ export function AccessoryEditorModal({
   // Sensible starting values for a blank accessory.
   const [price, setPrice] = useState<number>(accessory?.price ?? 80);
   const [cost, setCost] = useState<number>(accessory?.cost ?? 200);
+  // Per-unit inventory: total owned, out on rent, and pulled from service.
+  // rented + unavailableUnits are kept ≤ stock by the stepper handlers below.
   const [stock, setStock] = useState<number>(accessory?.stock ?? 1);
+  const [rented, setRented] = useState<number>(accessory?.rented ?? 0);
+  const [unavailableUnits, setUnavailableUnits] = useState<number>(
+    accessory?.unavailableUnits ?? 0,
+  );
   const [imageUrl, setImageUrl] = useState<string | null>(
     accessory?.imageUrl ?? null,
   );
@@ -105,7 +169,16 @@ export function AccessoryEditorModal({
   function handleSave() {
     setError(null);
     startTransition(async () => {
-      const res = await saveAccessory({ id, name, price, cost, stock, imageUrl });
+      const res = await saveAccessory({
+        id,
+        name,
+        price,
+        cost,
+        stock,
+        rented,
+        unavailableUnits,
+        imageUrl,
+      });
       if (res.error) {
         setError(res.error);
         return;
@@ -233,31 +306,71 @@ export function AccessoryEditorModal({
               </div>
             </div>
 
-            {/* Stock counter */}
+            {/* Inventory — three counters. Owned is the total; the other two
+                track where those units are. rented + unavailableUnits are
+                clamped to never exceed owned, so "Available to rent" stays sane. */}
             <div>
-              <FieldLabel required hint="how many you own (limited)">
-                Stock on hand
+              <FieldLabel required hint="track how many units are where">
+                Inventory
               </FieldLabel>
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  aria-label="Decrease stock"
-                  onClick={() => setStock((s) => Math.max(0, s - 1))}
-                  className="flex h-11 w-11 items-center justify-center rounded-pill border border-border-soft bg-white text-2xl leading-none text-text-accent hover:bg-background-panel"
+              <div className="flex flex-col gap-2">
+                <Stepper
+                  label="Units owned"
+                  hint="total pieces you have"
+                  value={stock}
+                  onDec={() => {
+                    // Drop a unit off the top, trimming the buckets that no
+                    // longer fit: unavailable first, then rented.
+                    const owned = Math.max(0, stock - 1);
+                    const unavail = Math.min(unavailableUnits, owned);
+                    const out = Math.min(rented, owned - unavail);
+                    setStock(owned);
+                    setUnavailableUnits(unavail);
+                    setRented(out);
+                  }}
+                  onInc={() => setStock(stock + 1)}
+                />
+                <Stepper
+                  label="Out on rent"
+                  hint="with customers now — will return"
+                  value={rented}
+                  labelColor="text-brand-secondary"
+                  onDec={() => setRented(Math.max(0, rented - 1))}
+                  onInc={() =>
+                    setRented(Math.min(stock - unavailableUnits, rented + 1))
+                  }
+                />
+                <Stepper
+                  label="Unavailable"
+                  hint="damaged, lost, or in repair — not rentable"
+                  value={unavailableUnits}
+                  labelColor="text-state-error"
+                  onDec={() =>
+                    setUnavailableUnits(Math.max(0, unavailableUnits - 1))
+                  }
+                  onInc={() =>
+                    setUnavailableUnits(
+                      Math.min(stock - rented, unavailableUnits + 1),
+                    )
+                  }
+                />
+              </div>
+              <div className="mt-2 text-body-sm text-text-secondary">
+                Available to rent now:{" "}
+                <b
+                  className={
+                    accAvail({ stock, rented, unavailableUnits }) > 0
+                      ? "text-state-success"
+                      : "text-state-error"
+                  }
                 >
-                  −
-                </button>
-                <span className="min-w-10 text-center text-price-lg text-text-heading">
-                  {stock}
-                </span>
-                <button
-                  type="button"
-                  aria-label="Increase stock"
-                  onClick={() => setStock((s) => s + 1)}
-                  className="flex h-11 w-11 items-center justify-center rounded-pill border border-border-soft bg-white text-2xl leading-none text-text-accent hover:bg-background-panel"
-                >
-                  +
-                </button>
+                  {accAvail({ stock, rented, unavailableUnits })}
+                </b>
+                {accAvail({ stock, rented, unavailableUnits }) === 0
+                  ? rented > 0
+                    ? " — all units currently rented out"
+                    : " — currently unavailable"
+                  : ""}
               </div>
             </div>
 

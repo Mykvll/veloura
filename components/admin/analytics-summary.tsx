@@ -143,7 +143,7 @@ export function AnalyticsSummary({ data }: { data: AnalyticsData }) {
           icon={Sparkles}
           label="Accessories"
           value={data.accessoriesCount}
-          sub={`${data.outStock} out · ${data.lowStock} low stock`}
+          sub={`${data.rentedOut} rented out · ${data.unavailable} unavailable · ${data.lowStock} low`}
         />
         <StatCard
           icon={Wallet}

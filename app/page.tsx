@@ -72,7 +72,7 @@ export default async function Home() {
   // fetch them all. Oldest-first keeps the order stable as new ones are added.
   const { data: accessoryRows } = await supabase
     .from("accessories")
-    .select("id, name, price, stock, image_url")
+    .select("id, name, price, stock, rented, unavailable_units, image_url")
     .order("created_at", { ascending: true });
 
   const accessories: CustomerAccessory[] = (accessoryRows ?? []).map((a) => ({
@@ -80,6 +80,8 @@ export default async function Home() {
     name: a.name,
     price: a.price,
     stock: a.stock,
+    rented: a.rented ?? 0,
+    unavailableUnits: a.unavailable_units ?? 0,
     imageUrl: a.image_url,
   }));
 

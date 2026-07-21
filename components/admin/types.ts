@@ -26,7 +26,9 @@ export type AdminDress = {
 /**
  * The plain, serializable shape of an accessory as the admin UI works with it.
  * Maps 1:1 to the `accessories` table (price = rental add-on price, cost = your
- * unit cost, stock = how many you own).
+ * unit cost, stock = how many you own). `stock`/`rented`/`unavailableUnits`
+ * split the units into total owned / out on rent / pulled from service; what's
+ * actually rentable is `accAvail()` (see lib/accessories.ts).
  */
 export type AdminAccessory = {
   id: string;
@@ -35,8 +37,12 @@ export type AdminAccessory = {
   price: number;
   /** Your unit cost — feeds Analytics. */
   cost: number;
-  /** How many you own. Hidden/disabled for customers at 0. */
+  /** Total units you own. */
   stock: number;
+  /** Units out with customers right now (temporary; they return). */
+  rented: number;
+  /** Units pulled from service — damaged, lost, or in repair (not rentable). */
+  unavailableUnits: number;
   /** Public URL of the image in the dress-photos bucket, or null. */
   imageUrl: string | null;
 };
@@ -138,9 +144,12 @@ export type AnalyticsData = {
   topDressCount: number;
   /** Live dresses in the catalogue. */
   dressesLive: number;
-  /** Accessory catalogue size + how many are out (0) / low (≤2) on stock. */
+  /** Accessory catalogue size + a breakdown of the un-rentable ones: none
+   *  available but some out on rent / none available and none on rent (pulled
+   *  or none owned) / still available but low (≤2). */
   accessoriesCount: number;
-  outStock: number;
+  rentedOut: number;
+  unavailable: number;
   lowStock: number;
   /** Average earned per rental (verified + logged), or null when none yet. */
   avgPerRental: number | null;
