@@ -369,6 +369,9 @@ export default async function AdminDashboardPage() {
       start: b.start as string,
       end: b.end as string,
       deliver: b.deliver,
+      // Already resolved above (accessoryNamesByBooking) for the booking cards;
+      // the expanded calendar itemises the same add-ons inside each day cell.
+      accessories: b.accessories,
     }));
 
   // Logged pre-system rentals (rental_history) are past rentals too. `logged`
@@ -382,6 +385,8 @@ export default async function AdminDashboardPage() {
       start: h.start_date,
       end: h.end_date,
       deliver: null,
+      // rental_history predates this app and never recorded add-ons.
+      accessories: [],
       logged: true,
     }));
 

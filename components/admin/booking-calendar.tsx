@@ -1,7 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { CalendarCheck, ShoppingBag, Droplets } from "lucide-react";
+import { useMemo, useState, useSyncExternalStore } from "react";
+import {
+  CalendarCheck,
+  ShoppingBag,
+  Droplets,
+  Maximize2,
+  Minimize2,
+  Gem,
+} from "lucide-react";
 import { SectionTitle } from "@/components/section-title";
 import type { CalendarRental, CalendarFitting } from "./types";
 
@@ -51,6 +58,33 @@ function shortDate(iso: string) {
   });
 }
 
+/**
+ * Phones are too narrow for the expanded month grid — a 7-column layout can't
+ * fit dress names and accessories legibly. Mirrors the `mobile` Tailwind screen
+ * (max 719px) so the CSS and the JS agree on where the cut-off is.
+ */
+const NARROW_QUERY = "(max-width: 719px)";
+
+function subscribeNarrow(onChange: () => void) {
+  const mq = window.matchMedia(NARROW_QUERY);
+  mq.addEventListener("change", onChange);
+  return () => mq.removeEventListener("change", onChange);
+}
+
+/**
+ * True below 720px, kept live across resize / rotation. useSyncExternalStore
+ * rather than useState + useEffect so there's no post-mount setState flash.
+ * The server snapshot is `false` (assume wide) — safe because `expanded`
+ * starts false, so the first paint is the compact view either way.
+ */
+function useNarrow() {
+  return useSyncExternalStore(
+    subscribeNarrow,
+    () => window.matchMedia(NARROW_QUERY).matches,
+    () => false,
+  );
+}
+
 /** What sits on a single calendar day. */
 type DayAgenda = {
   rents: CalendarRental[];
@@ -84,9 +118,17 @@ export function BookingCalendar({
 
   const [selected, setSelected] = useState<string | null>(null);
   const [view, setView] = useState({ m: now.getMonth(), y: now.getFullYear() });
+  // Expanded = full-width month grid with each day's bookings written into the
+  // cell. Deliberately plain component state: NOT persisted to localStorage,
+  // the URL, or any store, so every page load/refresh starts collapsed.
+  const [expanded, setExpanded] = useState(false);
+  // Under 720px the expanded view is off the table entirely: the toggle is
+  // hidden and we force the compact grid + tap-a-day detail pane, even if the
+  // admin had expanded it on a wider screen and then rotated/resized down.
+  const narrow = useNarrow();
+  const showExpanded = expanded && !narrow;
   const { m: month, y: year } = view;
-  const isCurrentMonth =
-    month === now.getMonth() && year === now.getFullYear();
+  const isCurrentMonth = month === now.getMonth() && year === now.getFullYear();
 
   // Page forward/back n months, normalising the year rollover through Date.
   const shift = (n: number) =>
@@ -140,9 +182,40 @@ export function BookingCalendar({
         Booking Calendar
       </SectionTitle>
 
-      <div className="mt-8 grid grid-cols-1 items-start gap-6 rounded-lg border border-border-soft bg-background-card p-4 shadow-card lg:grid-cols-[1.2fr_1fr] lg:gap-7 lg:p-6">
-        {/* Left column — month header + day grid + legend. */}
+      {/* Collapsed: month grid (1.2fr) + day detail (1fr). Expanded: the detail
+          pane is unmounted and the grid takes the whole container width.
+          Below 720px it is always the collapsed layout, stacked in one column. */}
+      <div
+        className={`mt-8 grid grid-cols-1 items-start gap-6 rounded-lg border border-border-soft bg-background-card p-4 shadow-card lg:gap-7 lg:p-6 ${
+          showExpanded ? "" : "lg:grid-cols-[1.2fr_1fr]"
+        }`}
+      >
+        {/* Left column — expand toggle + month header + day grid + legend. */}
         <div>
+          {/* Gold pill toggle, sitting above the month header. Outline while
+              collapsed, filled gold once expanded — the prototype's on-state.
+              Hidden in CSS below 720px (not conditionally rendered) so it never
+              flashes in on a phone before hydration settles. */}
+          <div className="mb-2 flex justify-end mobile:hidden">
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              aria-expanded={showExpanded}
+              className={`inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-border-accent px-3.5 py-1.5 text-label-sm uppercase tracking-label transition-fast focus-visible:shadow-focus ${
+                showExpanded
+                  ? "bg-brand-primary text-text-on-primary hover:bg-brand-primary-hover"
+                  : "bg-white text-text-accent hover:bg-background-panel"
+              }`}
+            >
+              {showExpanded ? (
+                <Minimize2 className="h-[13px] w-[13px]" aria-hidden="true" />
+              ) : (
+                <Maximize2 className="h-[13px] w-[13px]" aria-hidden="true" />
+              )}
+              {showExpanded ? "Collapse" : "Expand calendar"}
+            </button>
+          </div>
+
           <div className="mb-3 flex items-center justify-between gap-2.5">
             <button
               type="button"
@@ -203,7 +276,11 @@ export function BookingCalendar({
                   key={key}
                   type="button"
                   onClick={() => setSelected(key)}
-                  className={`flex min-h-[52px] flex-col items-center gap-[3px] rounded-sm border px-0.5 py-1 text-body-sm transition-fast ${
+                  className={`flex flex-col gap-[3px] overflow-hidden rounded-sm border text-body-sm transition-fast ${
+                    showExpanded
+                      ? "min-h-[120px] items-stretch px-2 py-[7px] text-left"
+                      : "min-h-[52px] items-center px-0.5 py-1"
+                  } ${
                     isSel
                       ? "border-border-accent shadow-focus"
                       : isToday
@@ -211,25 +288,71 @@ export function BookingCalendar({
                         : "border-transparent"
                   } ${booked ? "bg-background-panel" : "bg-white"}`}
                 >
+                  {/* Expanded cells use the heavier heading brown at 13px, per
+                      the prototype; collapsed keeps the plain body number. */}
                   <span
-                    className={`${isSel || isToday ? "font-semibold" : ""} ${
-                      isToday ? "text-text-accent" : "text-text-primary"
-                    }`}
+                    className={
+                      showExpanded
+                        ? `text-[13px] ${isSel || isToday ? "font-bold" : "font-medium"} ${
+                            isToday ? "text-text-accent" : "text-text-heading"
+                          }`
+                        : `${isSel || isToday ? "font-semibold" : ""} ${
+                            isToday ? "text-text-accent" : "text-text-primary"
+                          }`
+                    }
                   >
                     {d}
                   </span>
-                  {/* Up to three dots: fitting (gold), rented (red), wash (taupe). */}
-                  <span className="flex h-1.5 gap-[3px]">
-                    {a && a.fittings.length ? (
-                      <span className="h-1.5 w-1.5 rounded-full bg-brand-primary" />
-                    ) : null}
-                    {a && a.rents.length ? (
-                      <span className="h-1.5 w-1.5 rounded-full bg-state-error" />
-                    ) : null}
-                    {a && a.wash.length ? (
-                      <span className="h-1.5 w-1.5 rounded-full bg-brand-secondary" />
-                    ) : null}
-                  </span>
+
+                  {showExpanded ? (
+                    /* Expanded: write the day's bookings into the cell itself —
+                       rentals (+ their accessories), then fittings, then wash
+                       days. Tiny type, and the cell clips whatever overflows. */
+                    <span className="mt-0.5 flex flex-col gap-1">
+                      {a?.rents.map((r) => (
+                        <span key={`r${r.id}`} className="block leading-[1.25]">
+                          <span className="block text-[11px] font-semibold text-state-error">
+                            {r.dress}
+                          </span>
+                          {r.accessories.length ? (
+                            <span className="block text-[10px] text-text-secondary">
+                              {r.accessories.join(", ")}
+                            </span>
+                          ) : null}
+                        </span>
+                      ))}
+                      {a?.fittings.map((f) => (
+                        <span
+                          key={`f${f.id}`}
+                          className="block text-[10px] leading-[1.25] text-text-accent"
+                        >
+                          Fitting{f.time ? ` · ${f.time}` : ""}
+                        </span>
+                      ))}
+                      {a?.wash.map((r) => (
+                        <span
+                          key={`w${r.id}`}
+                          className="block text-[10px] leading-[1.25] text-brand-secondary"
+                        >
+                          Wash · {r.dress}
+                        </span>
+                      ))}
+                    </span>
+                  ) : (
+                    /* Collapsed: up to three dots — fitting (gold), rented
+                       (red), wash (taupe). */
+                    <span className="flex h-1.5 gap-[3px]">
+                      {a && a.fittings.length ? (
+                        <span className="h-1.5 w-1.5 rounded-full bg-brand-primary" />
+                      ) : null}
+                      {a && a.rents.length ? (
+                        <span className="h-1.5 w-1.5 rounded-full bg-state-error" />
+                      ) : null}
+                      {a && a.wash.length ? (
+                        <span className="h-1.5 w-1.5 rounded-full bg-brand-secondary" />
+                      ) : null}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -242,8 +365,8 @@ export function BookingCalendar({
               Fitting
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-state-error" /> Rented
-              out
+              <span className="h-1.5 w-1.5 rounded-full bg-state-error" />{" "}
+              Rented out
             </span>
             <span className="inline-flex items-center gap-1.5">
               <span className="h-1.5 w-1.5 rounded-full bg-brand-secondary" />{" "}
@@ -252,92 +375,111 @@ export function BookingCalendar({
           </div>
         </div>
 
-        {/* Right column — agenda for the selected day. */}
-        <div className="flex flex-col gap-2.5">
-          {!selected ? (
-            <div className="text-body-sm text-text-secondary">
-              Pick a date to see its bookings, times and wash-day blocks.
-            </div>
-          ) : (
-            <>
-              <div className="text-label-base uppercase tracking-label text-text-heading">
-                {niceDate(selected)}
+        {/* Right column — agenda for the selected day. Dropped entirely in the
+            expanded view, where the cells carry that detail themselves. */}
+        {showExpanded ? null : (
+          <div className="flex flex-col gap-2.5">
+            {!selected ? (
+              <div className="text-body-sm text-text-secondary">
+                Pick a date to see its bookings, times and wash-day blocks.
               </div>
-
-              {nothingOn ? (
-                <div className="rounded-md bg-background-panel p-3.5 text-body-sm text-state-success">
-                  Fully open — all dresses available to rent and fit.
+            ) : (
+              <>
+                <div className="text-label-base uppercase tracking-label text-text-heading">
+                  {niceDate(selected)}
                 </div>
-              ) : null}
 
-              {info?.fittings.map((f) => (
-                <div
-                  key={`f${f.id}`}
-                  className="flex items-start gap-2.5 rounded-md bg-background-panel p-3.5 text-body-sm"
-                >
-                  <span className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-full bg-brand-primary text-text-on-primary">
-                    <CalendarCheck className="h-4 w-4" aria-hidden="true" />
-                  </span>
-                  <div>
-                    <b className="text-text-primary">Fitting · {f.time}</b>
-                    <div className="text-text-secondary">
-                      {f.renter} — {f.dress}
-                    </div>
+                {nothingOn ? (
+                  <div className="rounded-md bg-background-panel p-3.5 text-body-sm text-state-success">
+                    Fully open — all dresses available to rent and fit.
                   </div>
-                </div>
-              ))}
+                ) : null}
 
-              {info?.rents.map((r) => {
-                const isPickup = selected === r.start;
-                return (
+                {info?.fittings.map((f) => (
                   <div
-                    key={`r${r.id}`}
+                    key={`f${f.id}`}
                     className="flex items-start gap-2.5 rounded-md bg-background-panel p-3.5 text-body-sm"
                   >
-                    <span className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-full bg-state-error text-text-on-primary">
-                      <ShoppingBag className="h-4 w-4" aria-hidden="true" />
+                    <span className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-full bg-brand-primary text-text-on-primary">
+                      <CalendarCheck className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                    <div>
+                      <b className="text-text-primary">Fitting · {f.time}</b>
+                      <div className="text-text-secondary">
+                        {f.renter} — {f.dress}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {info?.rents.map((r) => {
+                  const isPickup = selected === r.start;
+                  return (
+                    <div
+                      key={`r${r.id}`}
+                      className="flex items-start gap-2.5 rounded-md bg-background-panel p-3.5 text-body-sm"
+                    >
+                      <span className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-full bg-state-error text-text-on-primary">
+                        <ShoppingBag className="h-4 w-4" aria-hidden="true" />
+                      </span>
+                      <div>
+                        <b className="text-text-primary">
+                          {r.dress} · rented out
+                          {isPickup && r.deliver
+                            ? ` · deliver ${r.deliver}`
+                            : ""}
+                        </b>
+                        <div className="text-text-secondary">
+                          {r.renter} · {niceDate(r.start)} – {niceDate(r.end)}
+                        </div>
+                        {isPickup ? (
+                          <div className="text-text-secondary">
+                            Return by {shortDate(addDays(r.end, 1))}
+                            {r.deliver ? `, ${r.deliver}` : ""}
+                          </div>
+                        ) : null}
+                        {/* Add-ons going out with the dress, as gem chips. */}
+                        {r.accessories.length ? (
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {r.accessories.map((acc, ai) => (
+                              <span
+                                key={`${r.id}-a${ai}`}
+                                className="inline-flex items-center gap-1.5 rounded-full border border-border-soft bg-background-panel px-2.5 py-0.5 text-body-sm text-text-heading"
+                              >
+                                <Gem className="h-3 w-3" aria-hidden="true" />
+                                {acc}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {info?.wash.map((r) => (
+                  <div
+                    key={`w${r.id}`}
+                    className="flex items-start gap-2.5 rounded-md bg-background-panel p-3.5 text-body-sm"
+                  >
+                    <span className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-full bg-brand-secondary text-text-on-primary">
+                      <Droplets className="h-4 w-4" aria-hidden="true" />
                     </span>
                     <div>
                       <b className="text-text-primary">
-                        {r.dress} · rented out
-                        {isPickup && r.deliver ? ` · deliver ${r.deliver}` : ""}
+                        {r.dress} · hand-wash in progress
                       </b>
                       <div className="text-text-secondary">
-                        {r.renter} · {niceDate(r.start)} – {niceDate(r.end)}
+                        Returned this day by {r.renter} — unavailable to rent
+                        and to fit while it is hand-washed.
                       </div>
-                      {isPickup ? (
-                        <div className="text-text-secondary">
-                          Return by {shortDate(addDays(r.end, 1))}
-                          {r.deliver ? `, ${r.deliver}` : ""}
-                        </div>
-                      ) : null}
                     </div>
                   </div>
-                );
-              })}
-
-              {info?.wash.map((r) => (
-                <div
-                  key={`w${r.id}`}
-                  className="flex items-start gap-2.5 rounded-md bg-background-panel p-3.5 text-body-sm"
-                >
-                  <span className="flex h-[34px] w-[34px] flex-none items-center justify-center rounded-full bg-brand-secondary text-text-on-primary">
-                    <Droplets className="h-4 w-4" aria-hidden="true" />
-                  </span>
-                  <div>
-                    <b className="text-text-primary">
-                      {r.dress} · hand-wash in progress
-                    </b>
-                    <div className="text-text-secondary">
-                      Returned this day by {r.renter} — unavailable to rent and
-                      to fit while it is hand-washed.
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </>
-          )}
-        </div>
+                ))}
+              </>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

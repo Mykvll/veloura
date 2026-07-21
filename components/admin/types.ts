@@ -175,6 +175,12 @@ export type CalendarRental = {
   end: string;
   /** Preferred delivery time, e.g. "10:00 AM" (shown on the pick-up day). */
   deliver: string | null;
+  /**
+   * Names of the accessories rented alongside the dress, e.g.
+   * ["Pearl drop earrings"]. Itemised list only — the money side stays in
+   * analytics' accessoryRevenue. Empty for rentals with no add-ons.
+   */
+  accessories: string[];
   /** Logged pre-system rental (rental_history): render rented days but no wash day. */
   logged?: boolean;
 };
