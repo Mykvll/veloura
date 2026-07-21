@@ -76,8 +76,11 @@ export function AccessoryPicker({
           <button
             key={a.id}
             type="button"
-            onClick={() => !out && onToggle(a.id)}
-            disabled={out}
+            // An add-on that's already ticked stays tappable even when it's out,
+            // so changing the date can never strand a pick the customer has no
+            // way to remove (it would block checkout with no visible fix).
+            onClick={() => (sel || !out) && onToggle(a.id)}
+            disabled={out && !sel}
             aria-pressed={sel}
             className={`flex min-h-tap items-center gap-3 rounded-sm border px-3.5 py-2 text-left transition-fast disabled:cursor-not-allowed disabled:opacity-55 ${
               sel

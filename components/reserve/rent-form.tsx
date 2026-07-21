@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { AccessoryPicker, type CustomerAccessory } from "../accessory-picker";
+import { accStateForBooking } from "@/lib/accessories";
 import { createRentHold } from "@/app/reserve-actions";
 import { saveHold } from "@/lib/hold-storage";
 import {
@@ -103,6 +104,16 @@ export function RentForm({
     .reduce((sum, a) => sum + a.price, 0);
   const total = dress.price + accessoriesTotal;
 
+  // Add-ons ticked earlier that the CURRENTLY chosen date has since made
+  // unavailable (e.g. picked first, then a clashing date). The server rejects
+  // these anyway (create_rent_hold → conflict 'accessory'), so we catch it here
+  // and say which one, instead of letting the customer hit that at checkout.
+  const unavailablePicked = accessories.filter(
+    (a) =>
+      picked.includes(a.id) &&
+      accStateForBooking(a, a.blockedDays, date).code !== "available",
+  );
+
   async function uploadId(file: File) {
     setError(null);
     setUploading(true);
@@ -133,6 +144,7 @@ export function RentForm({
     !!address.trim() &&
     !!deliverTime &&
     !!idPath &&
+    unavailablePicked.length === 0 &&
     !uploading &&
     !reserving;
 
@@ -252,6 +264,16 @@ export function RentForm({
             onToggle={toggle}
             startDate={date}
           />
+          {/* Names the add-on that clashes with the chosen date, so the disabled
+              Continue button is never a mystery. Tapping the row removes it. */}
+          {unavailablePicked.length > 0 ? (
+            <p className="mt-1.5 text-body-sm text-state-error">
+              {unavailablePicked.map((a) => a.name).join(", ")}{" "}
+              {unavailablePicked.length === 1 ? "isn't" : "aren't"} available on
+              your chosen date — tap to remove{" "}
+              {unavailablePicked.length === 1 ? "it" : "them"} to continue.
+            </p>
+          ) : null}
         </div>
       ) : null}
 

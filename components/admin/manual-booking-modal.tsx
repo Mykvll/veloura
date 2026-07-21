@@ -316,15 +316,22 @@ export function ManualBookingModal({
                       const st = accessoryState.get(a.id);
                       const out = st?.code !== "available";
                       const sel = picked.includes(a.id);
-                      // A picked add-on the current dates made unavailable is
-                      // still tappable, so the admin can untick it.
+                      // Availability is meaningless until there are dates to
+                      // check it against, so the rows stay locked until the
+                      // admin has picked a range (which needs a dress first).
+                      const locked = !selStart;
+                      // A picked add-on is ALWAYS tappable so it can be removed
+                      // — otherwise changing the dress/dates could strand a tick
+                      // that blocks saving with no way to undo it.
                       const mustRemove = sel && out;
                       return (
                         <button
                           key={a.id}
                           type="button"
-                          onClick={() => (!out || sel) && toggleAccessory(a.id)}
-                          disabled={out && !sel}
+                          onClick={() =>
+                            (sel || (!locked && !out)) && toggleAccessory(a.id)
+                          }
+                          disabled={(locked || out) && !sel}
                           className={`flex min-h-tap items-center gap-3 rounded-sm border px-3 py-2 text-left transition-fast disabled:cursor-not-allowed disabled:opacity-55 ${
                             mustRemove
                               ? "border-state-error bg-background-panel"
@@ -351,8 +358,8 @@ export function ManualBookingModal({
                                 out ? "text-state-error" : "text-text-secondary"
                               }`}
                             >
-                              {!selStart
-                                ? "pick dates to check"
+                              {locked
+                                ? "Pick a dress and dates first"
                                 : st?.code === "available"
                                   ? `${st.avail} available`
                                   : st?.code === "rented"
