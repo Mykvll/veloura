@@ -65,8 +65,9 @@ export type RentHoldInput = {
 
 export type CreateHoldResult = {
   error: string | null;
-  /** Set when a date clash blocked the hold, so the UI can tailor the message. */
-  conflict?: "hold" | "reserved" | "gone";
+  /** Set when a clash blocked the hold, so the UI can tailor the message.
+   *  "accessory" = a chosen add-on's last unit was just taken. */
+  conflict?: "hold" | "reserved" | "gone" | "accessory";
   bookingId?: string;
   /** ISO timestamp the hold lapses (server clock). */
   holdExpiresAt?: string;
@@ -113,7 +114,7 @@ export async function createRentHold(
 
   const res = data as {
     ok: boolean;
-    conflict?: "hold" | "reserved" | "gone";
+    conflict?: "hold" | "reserved" | "gone" | "accessory";
     error?: string;
     booking_id?: string;
     hold_expires_at?: string;
@@ -121,6 +122,13 @@ export async function createRentHold(
   };
 
   if (!res.ok) {
+    if (res.conflict === "accessory") {
+      return {
+        error:
+          "One of the add-ons you picked was just taken. Please go back, review your accessories, and try again.",
+        conflict: "accessory",
+      };
+    }
     if (res.conflict === "reserved") {
       return {
         error:
