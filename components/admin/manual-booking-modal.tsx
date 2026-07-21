@@ -128,11 +128,26 @@ export function ManualBookingModal({
 
   /** Range picking: start on any open day; extend forward while no taken day
    *  sits inside the range; any other tap restarts at the tapped day. */
+  /** Clear the whole date selection (also reachable via "Clear dates"). */
+  function clearDates() {
+    setError(null);
+    setSelStart(null);
+    setSelEnd(null);
+  }
+
   function pick(day: string) {
     setError(null);
     if (!selStart || day < selStart) {
       setSelStart(day);
       setSelEnd(null);
+      return;
+    }
+    // Tapping the start day again UNSELECTS: first tap drops the end (back to a
+    // single day), second tap clears the date entirely. Without this the admin
+    // could only ever move the start — never get back to "no dates picked".
+    if (day === selStart) {
+      if (selEnd) setSelEnd(null);
+      else clearDates();
       return;
     }
     for (let d = selStart; d <= day; d = addDays(d, 1)) {
@@ -142,7 +157,7 @@ export function ManualBookingModal({
         return;
       }
     }
-    setSelEnd(day === selStart ? null : day);
+    setSelEnd(day);
   }
 
   function pickDress(id: string) {
@@ -252,14 +267,32 @@ export function ManualBookingModal({
 
           {/* Body — calendar left, form right (stacked on mobile). */}
           <div className="grid grid-cols-1 gap-10 overflow-y-auto px-6 py-6 md:grid-cols-2">
-            <ManualBookingCalendar
-              taken={taken}
-              wash={wash}
-              selStart={selStart}
-              selEnd={selEnd}
-              disabled={dressId === ""}
-              onPick={pick}
-            />
+            <div className="flex flex-col gap-3">
+              <ManualBookingCalendar
+                taken={taken}
+                wash={wash}
+                selStart={selStart}
+                selEnd={selEnd}
+                disabled={dressId === ""}
+                onPick={pick}
+              />
+              {/* Explicit escape hatch — tapping the start day toggles it off
+                  too, but that isn't discoverable on its own. */}
+              {selStart ? (
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-body-sm text-text-secondary">
+                    {selEnd ? `${selStart} → ${selEnd}` : selStart}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={clearDates}
+                    className="min-h-tap rounded-pill border border-border-soft bg-white px-4 text-label-sm uppercase tracking-label text-text-secondary transition-fast hover:border-border-strong hover:text-text-heading focus-visible:shadow-focus"
+                  >
+                    Clear dates
+                  </button>
+                </div>
+              ) : null}
+            </div>
 
             <div className="flex flex-col gap-4">
               {/* Dress */}
