@@ -64,18 +64,19 @@ export default async function AdminLayout({
           </span>
 
           {/* Section links — right-aligned beside the lockup on wide screens.
-              The admin bar carries six links + sign-out, so its "narrow" mode
-              (links on their own full-width row under the lockup, scrolling
-              sideways if needed) applies below lg, not just below the 720px
-              brand breakpoint. */}
-          <div className="flex flex-1 justify-end overflow-x-auto max-lg:order-last max-lg:w-full max-lg:flex-none max-lg:justify-start max-lg:border-t max-lg:border-background-panel">
+              The admin bar carries seven links + a sign-out button, so it needs
+              more room than the customer nav: its "narrow" mode (links on their
+              own full-width row under the lockup, scrolling sideways if needed)
+              applies below xl, not just below the 720px brand breakpoint. Only
+              at xl+ do all seven links fit inline beside the lockup without
+              crowding. (We deliberately don't show the admin's email here — it
+              would push the inline row past the 1200px content width and squash
+              the links; the prototype's admin nav carries no email either.) */}
+          <div className="flex flex-1 justify-end overflow-x-auto max-xl:order-last max-xl:w-full max-xl:flex-none max-xl:justify-start max-xl:border-t max-xl:border-background-panel">
             <AdminNav />
           </div>
 
           <div className="ml-auto flex flex-none items-center gap-3">
-            <span className="hidden text-body-sm text-text-secondary xl:inline">
-              {user.email}
-            </span>
             {/* Sign out still runs as a server action; the client wrapper only
                 adds the "Signing out…" pending state on the button. */}
             <SignOutButton />
