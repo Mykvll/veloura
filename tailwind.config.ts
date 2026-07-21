@@ -54,6 +54,9 @@ export default {
         display: ["var(--font-display)", "Georgia", "serif"],
         body: ["var(--font-body)", '"Helvetica Neue"', "sans-serif"],
         script: ["var(--font-script)", "cursive"],
+        // Home-page hero tagline only — not part of the general type system.
+        "hero-serif": ["var(--font-hero-serif)", "Georgia", "serif"],
+        "hero-script": ["var(--font-hero-script)", "cursive"],
       },
       fontSize: {
         "display-2xl": ["4rem", { lineHeight: "1.05", fontWeight: "500", letterSpacing: "0.12em" }],

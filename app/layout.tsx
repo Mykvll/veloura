@@ -1,5 +1,11 @@
 import type { Metadata } from "next";
-import { Cormorant_Garamond, Poppins, Alex_Brush } from "next/font/google";
+import {
+  Cormorant_Garamond,
+  Poppins,
+  Alex_Brush,
+  Italiana,
+  Pinyon_Script,
+} from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +33,24 @@ const script = Alex_Brush({
   display: "swap",
 });
 
+// Hero-only pairing (font-hero-serif / font-hero-script). These override the
+// display font for the home-page tagline lockup ONLY — everything else keeps
+// Cormorant Garamond. See the "Every Entrance / deserves elegance" hero in
+// app/page.tsx and the design project's ui_kits/webapp/index.html.
+const heroSerif = Italiana({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-hero-serif",
+  display: "swap",
+});
+
+const heroScript = Pinyon_Script({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-hero-script",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "Veloura by CM",
   description: "Dress rental in Metro Manila",
@@ -49,6 +73,8 @@ export default function RootLayout({
         display.variable,
         body.variable,
         script.variable,
+        heroSerif.variable,
+        heroScript.variable,
       )}
     >
       <body className="min-h-full flex flex-col">{children}</body>

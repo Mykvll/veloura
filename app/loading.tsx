@@ -26,10 +26,29 @@ export default function CollectionLoading() {
           className="h-[110px] w-[110px] rounded-full shadow-card"
           priority
         />
-        <h1 className="font-display text-display-xl uppercase tracking-display text-text-accent">
-          Wear luxury,
-          <br />
-          not the price.
+        {/* Same tagline lockup as app/page.tsx — keep the two in sync so the
+            loading state doesn't flash a different headline. */}
+        <h1 className="text-text-accent">
+          <span
+            className="block font-hero-serif uppercase"
+            style={{
+              fontSize: "clamp(44px, 8vw, 84px)",
+              lineHeight: 1.02,
+              letterSpacing: "0.06em",
+            }}
+          >
+            Every Entrance
+          </span>
+          <span
+            className="block font-hero-script"
+            style={{
+              fontSize: "clamp(40px, 7vw, 76px)",
+              lineHeight: 1,
+              marginTop: "0.06em",
+            }}
+          >
+            deserves elegance
+          </span>
         </h1>
         <p className="text-label-base uppercase tracking-label text-text-secondary">
           Graduation · Weddings · Formal Events · Date Nights
