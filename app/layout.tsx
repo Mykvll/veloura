@@ -7,6 +7,7 @@ import {
   Pinyon_Script,
   Marcellus,
 } from "next/font/google";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 
@@ -90,7 +91,12 @@ export default function RootLayout({
         section.variable,
       )}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        {/* Vercel Speed Insights — reports real-user Core Web Vitals to the
+            Vercel dashboard. No-ops outside Vercel deployments. */}
+        <SpeedInsights />
+      </body>
     </html>
   );
 }
