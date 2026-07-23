@@ -3,8 +3,71 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { fittingSlots } from "@/lib/reserve";
+import { notifyOwner } from "@/lib/notify/telegram";
 
 type ActionResult = { error: string | null };
+
+/**
+ * The booking details the RPCs hand back on success, used to compose the owner's
+ * Telegram notification. Fields are whichever apply to the booking type (rent
+ * carries dates + payment method; fitting carries a date + time slot).
+ */
+type BookingSummary = {
+  renter_name?: string;
+  contact?: string;
+  dress_name?: string;
+  start_date?: string;
+  end_date?: string;
+  payment_method?: string;
+  fitting_date?: string;
+  fitting_time?: string;
+  parking?: boolean;
+};
+
+/** "2026-07-25" → "Jul 25, 2026" for a compact, readable notification line. */
+function fmtDate(iso?: string): string {
+  if (!iso) return "";
+  const d = new Date(`${iso}T00:00:00`);
+  return Number.isNaN(d.getTime())
+    ? iso
+    : d.toLocaleDateString("en-PH", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+}
+
+/** Compose the plain-text Telegram message for a completed rent booking. */
+function rentNotification(s: BookingSummary): string {
+  const dates =
+    s.start_date && s.end_date && s.end_date !== s.start_date
+      ? `${fmtDate(s.start_date)} – ${fmtDate(s.end_date)}`
+      : fmtDate(s.start_date);
+  return [
+    "🛍️ New RENT booking — payment submitted",
+    `Dress: ${s.dress_name ?? "—"}`,
+    `Customer: ${s.renter_name ?? "—"}`,
+    `Contact: ${s.contact ?? "—"}`,
+    `Dates: ${dates || "—"}`,
+    `Paid via: ${s.payment_method ?? "—"}`,
+    "",
+    "Verify it in the admin › Bookings.",
+  ].join("\n");
+}
+
+/** Compose the plain-text Telegram message for a new fitting booking. */
+function fittingNotification(s: BookingSummary): string {
+  return [
+    "📏 New FITTING booking",
+    `Dress: ${s.dress_name ?? "—"}`,
+    `Customer: ${s.renter_name ?? "—"}`,
+    `Contact: ${s.contact ?? "—"}`,
+    `When: ${fmtDate(s.fitting_date)}${s.fitting_time ? ` · ${s.fitting_time}` : ""}`,
+    s.parking ? "Parking: yes" : "Parking: no",
+    "",
+    "See it in the admin › Bookings.",
+  ].join("\n");
+}
 
 /**
  * WHY WE VALIDATE THE UPLOAD PATH SHAPE
@@ -186,7 +249,7 @@ export async function attachRentPayment(
   });
   if (error) return { error: "Couldn't submit your payment. Please try again." };
 
-  const res = data as { ok: boolean; error?: string };
+  const res = data as { ok: boolean; error?: string; summary?: BookingSummary };
   if (!res.ok) {
     if (res.error === "expired") {
       return {
@@ -195,6 +258,13 @@ export async function attachRentPayment(
       };
     }
     return { error: "Couldn't submit your payment. Please try again." };
+  }
+
+  // Ping the owner on Telegram — best-effort, never awaited (see notifyOwner).
+  // `summary` is present only on the fresh hold→pending transition, so a client
+  // retry (already-pending) won't re-notify.
+  if (res.summary) {
+    void notifyOwner(rentNotification(res.summary));
   }
 
   revalidatePath("/");
@@ -264,7 +334,12 @@ export async function createFittingBooking(
   });
   if (error) return { error: "Couldn't book your fitting. Please try again." };
 
-  const res = data as { ok: boolean; conflict?: "day" | "slot"; error?: string };
+  const res = data as {
+    ok: boolean;
+    conflict?: "day" | "slot";
+    error?: string;
+    summary?: BookingSummary;
+  };
   if (!res.ok) {
     if (res.conflict === "day") {
       return { error: "Sorry — that day is no longer open for fittings." };
@@ -279,6 +354,11 @@ export async function createFittingBooking(
     }
     // Field problems (the UI enforces these too).
     return { error: "Please check your details and try again." };
+  }
+
+  // Ping the owner on Telegram — best-effort, never awaited (see notifyOwner).
+  if (res.summary) {
+    void notifyOwner(fittingNotification(res.summary));
   }
 
   // A new pending fitting occupies its slot — refresh so the page reflects it.
