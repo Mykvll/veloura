@@ -37,12 +37,37 @@ function fmtDate(iso?: string): string {
       });
 }
 
+/**
+ * Which site the booking came from, for the notification footer. Vercel sets
+ * VERCEL_ENV automatically ("production" | "preview" | "development"), so we can
+ * tell the LIVE site from PRE-PROD without any extra config — and hand over a
+ * tappable admin link (Telegram auto-links bare URLs in plain text). Both
+ * deployments share one Telegram group, so this is how you tell pings apart.
+ */
+function siteContext(): { tag: string; adminUrl: string } {
+  switch (process.env.VERCEL_ENV) {
+    case "production":
+      return {
+        tag: "🟢 LIVE — velourabycm.com",
+        adminUrl: "https://velourabycm.com/admin",
+      };
+    case "preview":
+      return {
+        tag: "🧪 PRE-PROD — veloura-by-cm.vercel.app",
+        adminUrl: "https://veloura-by-cm.vercel.app/admin",
+      };
+    default:
+      return { tag: "💻 LOCAL", adminUrl: "http://localhost:3000/admin" };
+  }
+}
+
 /** Compose the plain-text Telegram message for a completed rent booking. */
 function rentNotification(s: BookingSummary): string {
   const dates =
     s.start_date && s.end_date && s.end_date !== s.start_date
       ? `${fmtDate(s.start_date)} – ${fmtDate(s.end_date)}`
       : fmtDate(s.start_date);
+  const ctx = siteContext();
   return [
     "🛍️ New RENT booking — payment submitted",
     `Dress: ${s.dress_name ?? "—"}`,
@@ -51,12 +76,14 @@ function rentNotification(s: BookingSummary): string {
     `Dates: ${dates || "—"}`,
     `Paid via: ${s.payment_method ?? "—"}`,
     "",
-    "Verify it in the admin › Bookings.",
+    ctx.tag,
+    `Verify it › ${ctx.adminUrl}`,
   ].join("\n");
 }
 
 /** Compose the plain-text Telegram message for a new fitting booking. */
 function fittingNotification(s: BookingSummary): string {
+  const ctx = siteContext();
   return [
     "📏 New FITTING booking",
     `Dress: ${s.dress_name ?? "—"}`,
@@ -65,7 +92,8 @@ function fittingNotification(s: BookingSummary): string {
     `When: ${fmtDate(s.fitting_date)}${s.fitting_time ? ` · ${s.fitting_time}` : ""}`,
     s.parking ? "Parking: yes" : "Parking: no",
     "",
-    "See it in the admin › Bookings.",
+    ctx.tag,
+    `See it › ${ctx.adminUrl}`,
   ].join("\n");
 }
 
