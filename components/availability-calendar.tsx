@@ -177,13 +177,16 @@ export function AvailabilityCalendar({
           if (d === null) return <div key={`e${i}`} />;
 
           const key = dayKey(year, month, d);
-          const rentedOut = anyBlocked.has(key); // something is booked this day
+          // RENT: only THIS dress's bookings count as taken — other dresses are
+          // ignored (a day Emily is out doesn't touch this dress's calendar).
+          // FITTING: any dress out blocks the day. This drives the red dot, the
+          // shaded cell, AND the disabling below, matching the design prototype.
+          const rentedOut =
+            mode === "fitting" ? anyBlocked.has(key) : thisBlocked.has(key);
           const isSel = selected === key;
           const isToday = key === todayKey;
           const isPast = key < todayKey;
-          // RENT: only THIS dress's days block; FITTING: any booked day blocks.
-          const blockedDay =
-            mode === "fitting" ? rentedOut : thisBlocked.has(key);
+          const blockedDay = rentedOut;
           // A rental occupies 3 days (start, start+1, return), so a start date is
           // only offerable if start+1 and start+2 are also free — mirrors the DB
           // exclusion constraint. (FITTING picks a single day.)
