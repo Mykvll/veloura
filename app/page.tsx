@@ -59,12 +59,6 @@ function Hero() {
       <p className="text-label-base uppercase tracking-label text-text-secondary">
         Graduation · Weddings · Formal Events · Date Nights
       </p>
-      <a
-        href="#collection"
-        className="mt-1 inline-flex h-[52px] items-center justify-center rounded-pill bg-brand-primary px-[34px] text-label-base uppercase tracking-label text-text-on-primary transition-colors duration-fast ease-soft hover:bg-brand-primary-hover active:bg-brand-primary-active"
-      >
-        Browse the collection
-      </a>
     </section>
   );
 }
