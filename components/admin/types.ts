@@ -118,6 +118,10 @@ export type AdminPastRental = {
   contact?: string | null;
   /** Only present for "Booking" source — the dress ID. */
   dressId?: string | null;
+  /** Signed URL of the payment screenshot — "Booking" source only, null if none. */
+  proofUrl?: string | null;
+  /** Signed URL of the renter's valid ID — "Booking" source only, null if none. */
+  idPhotoUrl?: string | null;
 };
 
 /**
