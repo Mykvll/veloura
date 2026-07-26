@@ -99,9 +99,12 @@ export function BookingsManager({
   accessories: ManualBookingAccessoryOption[];
 }) {
   const router = useRouter();
-  // The proof shown full-size in the lightbox, the card mid-delete-confirm, and
-  // the card with an action in flight (to disable its buttons).
-  const [proofView, setProofView] = useState<AdminBooking | null>(null);
+  // The image shown full-size in the lightbox — either a payment proof or a
+  // renter's valid ID, so one viewer serves both.
+  const [lightbox, setLightbox] = useState<{
+    src: string;
+    caption: string;
+  } | null>(null);
   const [adding, setAdding] = useState(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [confirmRefundId, setConfirmRefundId] = useState<string | null>(null);
@@ -171,7 +174,12 @@ export function BookingsManager({
                 {b.proofUrl ? (
                   <button
                     type="button"
-                    onClick={() => setProofView(b)}
+                    onClick={() =>
+                      setLightbox({
+                        src: b.proofUrl!,
+                        caption: `Payment proof — ${b.renter}`,
+                      })
+                    }
                     aria-label={`View payment proof from ${b.renter}`}
                     className="flex-none rounded-sm border border-border-soft focus-visible:shadow-focus"
                   >
@@ -187,6 +195,33 @@ export function BookingsManager({
                     <ImageOff className="h-5 w-5" />
                   </span>
                 )}
+
+                {/* Renter's valid ID thumbnail — sits beside the proof so the
+                    admin can match the ID against the payer while verifying.
+                    Manual bookings never carry an ID upload, so no tile shows. */}
+                {b.idPhotoUrl ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setLightbox({
+                        src: b.idPhotoUrl!,
+                        caption: `Valid ID — ${b.renter}`,
+                      })
+                    }
+                    aria-label={`View valid ID from ${b.renter}`}
+                    className="relative flex-none rounded-sm border border-border-soft focus-visible:shadow-focus"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={b.idPhotoUrl}
+                      alt={`Valid ID from ${b.renter}`}
+                      className="h-16 w-16 cursor-zoom-in rounded-sm object-cover"
+                    />
+                    <span className="absolute inset-x-0 bottom-0 bg-overlay-scrim-heavy py-0.5 text-center text-[10px] uppercase tracking-wide text-white">
+                      ID
+                    </span>
+                  </button>
+                ) : null}
 
                 {/* Renter / dress / dates / status */}
                 <div className="min-w-0 flex-1 basis-56">
@@ -372,22 +407,22 @@ export function BookingsManager({
         />
       ) : null}
 
-      {/* Proof lightbox — the full-size signed-URL image. */}
-      {proofView?.proofUrl ? (
+      {/* Lightbox — the full-size signed-URL image (payment proof or valid ID). */}
+      {lightbox ? (
         <div
           onClick={(e) => {
-            if (e.target === e.currentTarget) setProofView(null);
+            if (e.target === e.currentTarget) setLightbox(null);
           }}
           className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-3.5 bg-overlay-scrim-heavy p-6"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={proofView.proofUrl}
-            alt={`Payment proof from ${proofView.renter}`}
+            src={lightbox.src}
+            alt={lightbox.caption}
             className="max-h-[70vh] max-w-[90%] rounded-md shadow-float"
           />
           <div className="text-label-sm uppercase tracking-label text-white">
-            Payment proof — {proofView.renter} · tap outside to close
+            {lightbox.caption} · tap outside to close
           </div>
         </div>
       ) : null}

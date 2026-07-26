@@ -164,7 +164,7 @@ export default async function AdminDashboardPage() {
     .from("bookings")
     .select(
       `id, renter_name, dress_id, dress_name, contact, start_date, end_date,
-       deliver_time, amount, payment_status, manual, proof_url, created_at`,
+       deliver_time, amount, payment_status, manual, proof_url, id_photo_url, created_at`,
     )
     .eq("type", "rent")
     // Live customer holds are transient (a 10-min payment window) — they aren't
@@ -283,6 +283,15 @@ export default async function AdminDashboardPage() {
           .createSignedUrl(b.proof_url, 60 * 60); // valid 1 hour
         proofUrl = signed?.signedUrl ?? null;
       }
+      // Same private bucket, same short-lived signed URL as the proof — the
+      // renter's uploaded valid ID so the admin can match it against the payer.
+      let idPhotoUrl: string | null = null;
+      if (b.id_photo_url) {
+        const { data: signed } = await supabase.storage
+          .from("payment-proofs")
+          .createSignedUrl(b.id_photo_url, 60 * 60); // valid 1 hour
+        idPhotoUrl = signed?.signedUrl ?? null;
+      }
       return {
         id: b.id,
         renter: b.renter_name,
@@ -297,6 +306,7 @@ export default async function AdminDashboardPage() {
         manual: b.manual,
         bookedAt: b.created_at,
         proofUrl,
+        idPhotoUrl,
         accessories: accessoryNamesByBooking.get(b.id) ?? [],
       };
     }),
