@@ -27,6 +27,11 @@ function HistoryEntryRow({
   isRemoving: boolean;
 }) {
   const [confirmRemove, setConfirmRemove] = useState(false);
+  // Full-size viewer for a completed booking's payment proof or valid ID.
+  const [lightbox, setLightbox] = useState<{
+    src: string;
+    caption: string;
+  } | null>(null);
   const [, startTransition] = useTransition();
   const router = useRouter();
 
@@ -42,6 +47,52 @@ function HistoryEntryRow({
 
   return (
     <div className="flex flex-wrap items-center gap-3.5 rounded-lg border border-border-soft bg-background-card p-4 shadow-card">
+      {/* Payment proof + valid ID thumbnails — completed bookings only (logged
+          pre-system rentals have no uploads). Tap to view full-size. */}
+      {entry.proofUrl ? (
+        <button
+          type="button"
+          onClick={() =>
+            setLightbox({
+              src: entry.proofUrl!,
+              caption: `Payment proof — ${entry.renter}`,
+            })
+          }
+          aria-label={`View payment proof from ${entry.renter}`}
+          className="flex-none rounded-sm border border-border-soft focus-visible:shadow-focus"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={entry.proofUrl}
+            alt={`Payment proof from ${entry.renter}`}
+            className="h-16 w-16 cursor-zoom-in rounded-sm object-cover"
+          />
+        </button>
+      ) : null}
+      {entry.idPhotoUrl ? (
+        <button
+          type="button"
+          onClick={() =>
+            setLightbox({
+              src: entry.idPhotoUrl!,
+              caption: `Valid ID — ${entry.renter}`,
+            })
+          }
+          aria-label={`View valid ID from ${entry.renter}`}
+          className="relative flex-none rounded-sm border border-border-soft focus-visible:shadow-focus"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={entry.idPhotoUrl}
+            alt={`Valid ID from ${entry.renter}`}
+            className="h-16 w-16 cursor-zoom-in rounded-sm object-cover"
+          />
+          <span className="absolute inset-x-0 bottom-0 bg-overlay-scrim-heavy py-0.5 text-center text-[10px] uppercase tracking-wide text-white">
+            ID
+          </span>
+        </button>
+      ) : null}
+
       {/* Renter / dress / dates / amount */}
       <div className="min-w-0 flex-1 basis-56">
         <div className="text-label-base uppercase tracking-wide text-text-heading">
@@ -99,6 +150,26 @@ function HistoryEntryRow({
               Remove
             </button>
           )}
+        </div>
+      ) : null}
+
+      {/* Lightbox — the full-size signed-URL image (payment proof or valid ID). */}
+      {lightbox ? (
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setLightbox(null);
+          }}
+          className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-3.5 bg-overlay-scrim-heavy p-6"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={lightbox.src}
+            alt={lightbox.caption}
+            className="max-h-[70vh] max-w-[90%] rounded-md shadow-float"
+          />
+          <div className="text-label-sm uppercase tracking-label text-white">
+            {lightbox.caption} · tap outside to close
+          </div>
         </div>
       ) : null}
     </div>

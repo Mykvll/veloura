@@ -463,6 +463,8 @@ export default async function AdminDashboardPage() {
     source: "Booking",
     contact: b.contact,
     dressId: b.dressId,
+    proofUrl: b.proofUrl,
+    idPhotoUrl: b.idPhotoUrl,
   }));
 
   const loggedAsHistory: AdminPastRental[] = (pastRentals ?? []).map((h) => ({

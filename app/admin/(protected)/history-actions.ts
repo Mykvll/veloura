@@ -126,6 +126,8 @@ export async function fetchHistoryPage(
     end: string;
     amount: number;
     source: "Booking" | "Logged";
+    proofUrl?: string | null;
+    idPhotoUrl?: string | null;
   }>;
   total: number;
   totalEarned: number;
@@ -143,7 +145,9 @@ export async function fetchHistoryPage(
   // Completed bookings (verified + wash day in past).
   let bookingsQuery = supabase
     .from("bookings")
-    .select("id, renter_name, dress_name, start_date, end_date, amount, end_date")
+    .select(
+      "id, renter_name, dress_name, start_date, end_date, amount, proof_url, id_photo_url",
+    )
     .eq("type", "rent")
     .eq("payment_status", "verified");
 
@@ -170,24 +174,46 @@ export async function fetchHistoryPage(
     throw new Error(bookingsErr?.message || historyErr?.message);
   }
 
-  // Filter bookings to only completed ones (wash day in past).
-  const completedBookings = (bookingsData ?? [])
-    .filter((b) => {
-      if (!b.end_date) return false;
-      const washDay = new Date(b.end_date);
-      washDay.setDate(washDay.getDate() + 1);
-      const washDayIso = washDay.toISOString().split("T")[0];
-      return washDayIso < today;
-    })
-    .map((b) => ({
-      id: b.id,
-      renter: b.renter_name,
-      dress: b.dress_name ?? "Dress",
-      start: b.start_date as string,
-      end: b.end_date as string,
-      amount: b.amount ?? 0,
-      source: "Booking" as const,
-    }));
+  // Filter bookings to only completed ones (wash day in past), then mint a
+  // short-lived SIGNED URL for each private proof / ID file (same pattern as the
+  // Bookings section) so the admin can review them from history too.
+  const completedBookings = await Promise.all(
+    (bookingsData ?? [])
+      .filter((b) => {
+        if (!b.end_date) return false;
+        const washDay = new Date(b.end_date);
+        washDay.setDate(washDay.getDate() + 1);
+        const washDayIso = washDay.toISOString().split("T")[0];
+        return washDayIso < today;
+      })
+      .map(async (b) => {
+        let proofUrl: string | null = null;
+        if (b.proof_url) {
+          const { data: signed } = await supabase.storage
+            .from("payment-proofs")
+            .createSignedUrl(b.proof_url, 60 * 60);
+          proofUrl = signed?.signedUrl ?? null;
+        }
+        let idPhotoUrl: string | null = null;
+        if (b.id_photo_url) {
+          const { data: signed } = await supabase.storage
+            .from("payment-proofs")
+            .createSignedUrl(b.id_photo_url, 60 * 60);
+          idPhotoUrl = signed?.signedUrl ?? null;
+        }
+        return {
+          id: b.id,
+          renter: b.renter_name,
+          dress: b.dress_name ?? "Dress",
+          start: b.start_date as string,
+          end: b.end_date as string,
+          amount: b.amount ?? 0,
+          source: "Booking" as const,
+          proofUrl,
+          idPhotoUrl,
+        };
+      }),
+  );
 
   const loggedRentals = (historyData ?? []).map((h) => ({
     id: h.id,
