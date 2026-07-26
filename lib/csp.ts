@@ -36,13 +36,19 @@ export function buildCsp(nonce: string, isDev: boolean): string {
     .filter(Boolean)
     .join(" ");
 
+  // hCaptcha (admin login bot check) loads a script, an iframe, and its own
+  // stylesheet from these hosts, and calls its verify API over fetch. Listing
+  // them keeps the CSP clean once we flip from report-only to enforcing.
+  const hcaptcha = "https://hcaptcha.com https://*.hcaptcha.com";
+
   const directives = [
     `default-src 'self'`,
-    `script-src ${scriptSrc}`,
-    `style-src 'self' 'unsafe-inline'`,
+    `script-src ${scriptSrc} ${hcaptcha}`,
+    `style-src 'self' 'unsafe-inline' ${hcaptcha}`,
     `img-src 'self' blob: data: https://*.supabase.co`,
     `font-src 'self'`,
-    `connect-src 'self' https://*.supabase.co`,
+    `connect-src 'self' https://*.supabase.co ${hcaptcha}`,
+    `frame-src ${hcaptcha}`,
     `object-src 'none'`,
     `base-uri 'self'`,
     `form-action 'self'`,
