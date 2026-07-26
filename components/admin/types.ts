@@ -89,6 +89,8 @@ export type AdminBooking = {
   bookedAt: string | null;
   /** Signed URL of the payment screenshot, or null if none was uploaded. */
   proofUrl: string | null;
+  /** Signed URL of the renter's uploaded valid ID, or null if none. */
+  idPhotoUrl: string | null;
   /** Names of the add-ons going out with this rental (from booking_accessories),
    *  so the admin has a hand-over checklist. Empty when there are none. */
   accessories: string[];
