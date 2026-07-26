@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import HCaptcha from "@hcaptcha/react-hcaptcha";
 import { login, type LoginState } from "./actions";
 
@@ -23,24 +23,26 @@ const HCAPTCHA_SITE_KEY =
  * single-use token we stash in a hidden field for the server action to verify.
  */
 export function LoginForm() {
-  // `state` holds whatever the action returned (e.g. an error); `formAction`
-  // is what we hand to <form action={...}>; `pending` is true while the action
-  // is running so we can disable the button.
-  const [state, formAction, pending] = useActionState(login, initialState);
-
-  // The hCaptcha token, set once the widget verifies the visitor. It's cleared
-  // after each submit because hCaptcha tokens are single-use.
+  // The hCaptcha token, set once the widget verifies the visitor. Cleared after
+  // each submit because hCaptcha tokens are single-use — even a failed sign-in
+  // spends the token (Supabase verifies the captcha before the password).
   const [captchaToken, setCaptchaToken] = useState("");
   const captchaRef = useRef<HCaptcha>(null);
 
-  // A completed attempt (success redirects away; failure returns an error)
-  // burns the token. Reset the widget so the next try gets a fresh one.
-  useEffect(() => {
-    if (state.error) {
+  // Wrap the server action so we can reset the spent token after a failed
+  // attempt. We do this here rather than in a useEffect so the state update
+  // stays out of an effect (lint: react-hooks/set-state-in-effect). On success
+  // `login` throws a redirect, so the reset below is skipped — we're navigating
+  // away anyway.
+  const [state, formAction, pending] = useActionState(
+    async (prev: LoginState, formData: FormData) => {
+      const result = await login(prev, formData);
       setCaptchaToken("");
       captchaRef.current?.resetCaptcha();
-    }
-  }, [state.error]);
+      return result;
+    },
+    initialState,
+  );
 
   return (
     <form action={formAction} className="mt-8 space-y-5">
