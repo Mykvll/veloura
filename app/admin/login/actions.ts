@@ -22,16 +22,34 @@ export async function login(
 ): Promise<LoginState> {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+  // hCaptcha proves a human (not a brute-force bot) is signing in. The widget
+  // in login-form.tsx produces this single-use token; Supabase Auth verifies it
+  // against the secret key configured in the dashboard before checking the
+  // password, so a bot without a valid token never reaches the password check.
+  const captchaToken = String(formData.get("captchaToken") ?? "");
 
   if (!email || !password) {
     return { error: "Please enter your email and password." };
   }
+  if (!captchaToken) {
+    return { error: "Please complete the CAPTCHA and try again." };
+  }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+    options: { captchaToken },
+  });
 
   if (error) {
-    // Keep the message generic — don't reveal whether the email exists.
+    // A failed captcha check (expired/reused token, or a misconfigured secret)
+    // surfaces here too — call it out so the user knows to redo the widget
+    // rather than second-guessing their password.
+    if (/captcha/i.test(error.message)) {
+      return { error: "CAPTCHA check failed. Please try again." };
+    }
+    // Otherwise keep the message generic — don't reveal whether the email exists.
     return { error: "Incorrect email or password." };
   }
 

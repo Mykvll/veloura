@@ -4,6 +4,11 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { fittingSlots } from "@/lib/reserve";
 import { notifyOwner } from "@/lib/notify/telegram";
+import { withinRateLimit } from "@/lib/rate-limit";
+
+/** Shown when an IP trips the per-action rate limit (see lib/rate-limit.ts). */
+const RATE_LIMIT_MESSAGE =
+  "You're going a little too fast. Please wait a moment and try again.";
 
 type ActionResult = { error: string | null };
 
@@ -174,6 +179,12 @@ export type CreateHoldResult = {
 export async function createRentHold(
   input: RentHoldInput,
 ): Promise<CreateHoldResult> {
+  // Throttle first — a hold blocks a dress's dates, so it's the most abusable
+  // path. Rejecting over-limit callers here avoids touching the DB at all.
+  if (!(await withinRateLimit("rent-hold"))) {
+    return { error: RATE_LIMIT_MESSAGE };
+  }
+
   const supabase = await createClient();
 
   const name = input.name.trim();
@@ -263,6 +274,10 @@ export async function attachRentPayment(
   paymentMethod: string,
   proofPath: string,
 ): Promise<ActionResult> {
+  if (!(await withinRateLimit("rent-payment"))) {
+    return { error: RATE_LIMIT_MESSAGE };
+  }
+
   const supabase = await createClient();
 
   if (!paymentMethod) return { error: "Please choose a payment option." };
@@ -324,6 +339,10 @@ export type FittingBookingInput = {
 export async function createFittingBooking(
   input: FittingBookingInput,
 ): Promise<ActionResult> {
+  if (!(await withinRateLimit("fitting"))) {
+    return { error: RATE_LIMIT_MESSAGE };
+  }
+
   const supabase = await createClient();
 
   const name = input.name.trim();
