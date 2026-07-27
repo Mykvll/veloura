@@ -10,6 +10,13 @@ import {
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
 import { cn } from "@/lib/utils";
+import {
+  SITE_URL,
+  SITE_NAME,
+  SITE_DESCRIPTION,
+  SITE_KEYWORDS,
+  SITE_TAGLINE,
+} from "@/lib/site";
 
 // Display serif — page titles, section/card headings (font-display).
 const display = Cormorant_Garamond({
@@ -65,8 +72,41 @@ const section = Marcellus({
 });
 
 export const metadata: Metadata = {
-  title: "Veloura by CM",
-  description: "Dress rental in Metro Manila",
+  // metadataBase lets Next resolve the relative OG/canonical URLs below to
+  // absolute ones (required for valid Open Graph tags).
+  metadataBase: new URL(SITE_URL),
+  // Template: sub-pages can set just `title: "Foo"` and get "Foo | Veloura by CM".
+  // `default`/`absolute` keep the home page's title clean (no trailing brand).
+  title: {
+    default: `${SITE_NAME} — Dress Rental in Metro Manila`,
+    template: `%s | ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  keywords: SITE_KEYWORDS,
+  applicationName: SITE_NAME,
+  // Canonical URL for the home page — prevents duplicate-content dilution from
+  // query strings, www/non-www, etc.
+  alternates: { canonical: "/" },
+  // Open Graph — the preview card shown when a link is shared on Facebook,
+  // Messenger, Viber, WhatsApp, Instagram, iMessage, LinkedIn, etc. (i.e. every
+  // platform our customers actually use). Uses app/opengraph-image (the
+  // file-based convention) for the image, so no `images` array is needed here.
+  // Note: we deliberately don't set Twitter-card tags — X falls back to these
+  // Open Graph tags, and Veloura has no Twitter presence to tailor for.
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} — ${SITE_TAGLINE}`,
+    description: SITE_DESCRIPTION,
+    url: SITE_URL,
+    locale: "en_PH",
+  },
+  // Let Google index the public site and follow its links.
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true },
+  },
 };
 
 export default function RootLayout({
