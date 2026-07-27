@@ -163,8 +163,8 @@ export default async function AdminDashboardPage() {
   const { data: rentalRows } = await supabase
     .from("bookings")
     .select(
-      `id, renter_name, dress_id, dress_name, contact, start_date, end_date,
-       deliver_time, amount, payment_status, manual, proof_url, id_photo_url, created_at`,
+      `id, renter_name, dress_id, dress_name, contact, address, start_date, end_date,
+       deliver_time, amount, payment_status, payment_method, manual, proof_url, id_photo_url, created_at`,
     )
     .eq("type", "rent")
     // Live customer holds are transient (a 10-min payment window) — they aren't
@@ -298,6 +298,8 @@ export default async function AdminDashboardPage() {
         dress: b.dress_name ?? "Dress",
         dressId: b.dress_id,
         contact: b.contact,
+        address: b.address,
+        paymentMethod: b.payment_method,
         start: b.start_date,
         end: b.end_date,
         deliver: b.deliver_time,

@@ -9,6 +9,7 @@ import {
   ImageOff,
   PenLine,
   RotateCcw,
+  X,
 } from "lucide-react";
 import { niceDate } from "@/lib/reserve";
 import {
@@ -74,6 +75,158 @@ function bookedLabel(iso: string | null): string | null {
   });
 }
 
+/** Whole-peso amount, matching the rest of the admin UI. */
+function peso(n: number): string {
+  return `₱${n.toLocaleString("en-PH")}`;
+}
+
+/** One label/value row inside the details modal. Hidden when there's no value,
+ *  so a manual booking (no address/contact/etc.) simply shows fewer rows. */
+function DetailRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: React.ReactNode;
+}) {
+  if (value === null || value === undefined || value === "") return null;
+  return (
+    <div className="flex flex-col gap-0.5 border-b border-border-soft py-2.5 last:border-b-0 sm:flex-row sm:gap-4">
+      <span className="text-label-sm uppercase tracking-label text-text-secondary sm:w-40 sm:flex-none">
+        {label}
+      </span>
+      <span className="text-body-base text-text-primary">{value}</span>
+    </div>
+  );
+}
+
+/**
+ * Full booking details in a modal — everything the customer filled on the
+ * reserve form, plus the payment proof + valid ID. Opened by clicking a booking
+ * card. Read-only: the verify/refund/delete actions stay on the card.
+ */
+function BookingDetailsModal({
+  booking: b,
+  onClose,
+  onViewImage,
+}: {
+  booking: AdminBooking;
+  onClose: () => void;
+  onViewImage: (src: string, caption: string) => void;
+}) {
+  const meta = STATUS_META[b.status] ?? STATUS_META.pending;
+  const dates =
+    b.start || b.end
+      ? `${b.start ? niceDate(b.start) : "—"}${b.end ? ` – ${niceDate(b.end)}` : ""}`
+      : null;
+  return (
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-overlay-scrim-heavy p-4"
+    >
+      <div className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-lg bg-white shadow-float">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-border-soft p-6">
+          <h2 className="font-display text-display-md uppercase tracking-display text-text-accent">
+            Booking Details
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-background-panel"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* All the fields, scrollable when tall. */}
+        <div className="overflow-y-auto px-6 py-4">
+          <DetailRow label="Renter" value={b.renter} />
+          <DetailRow label="Dress" value={b.dress} />
+          <DetailRow
+            label="Status"
+            value={
+              <span
+                className={`inline-flex items-center gap-1.5 text-label-sm uppercase tracking-wide ${meta.className}`}
+              >
+                <meta.Icon className="h-3.5 w-3.5" />
+                {meta.label}
+              </span>
+            }
+          />
+          <DetailRow label="Rental dates" value={dates} />
+          <DetailRow label="Delivery time" value={b.deliver} />
+          <DetailRow label="Contact" value={b.contact} />
+          <DetailRow label="Address" value={b.address} />
+          <DetailRow label="Payment method" value={b.paymentMethod} />
+          <DetailRow label="Amount" value={peso(b.amount)} />
+          <DetailRow
+            label="Add-ons"
+            value={b.accessories.length > 0 ? b.accessories.join(", ") : null}
+          />
+          <DetailRow
+            label="Booked"
+            value={b.manual ? "Manual booking" : bookedLabel(b.bookedAt)}
+          />
+
+          {/* Payment proof + valid ID — tap to view full-size. */}
+          {b.proofUrl || b.idPhotoUrl ? (
+            <div className="mt-4 flex flex-wrap gap-4">
+              {b.proofUrl ? (
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-label-sm uppercase tracking-label text-text-secondary">
+                    Payment proof
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onViewImage(b.proofUrl!, `Payment proof — ${b.renter}`)
+                    }
+                    className="rounded-sm border border-border-soft focus-visible:shadow-focus"
+                    aria-label={`View payment proof from ${b.renter}`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={b.proofUrl}
+                      alt={`Payment proof from ${b.renter}`}
+                      className="h-32 w-32 cursor-zoom-in rounded-sm object-cover"
+                    />
+                  </button>
+                </div>
+              ) : null}
+              {b.idPhotoUrl ? (
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-label-sm uppercase tracking-label text-text-secondary">
+                    Valid ID
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onViewImage(b.idPhotoUrl!, `Valid ID — ${b.renter}`)
+                    }
+                    className="rounded-sm border border-border-soft focus-visible:shadow-focus"
+                    aria-label={`View valid ID from ${b.renter}`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={b.idPhotoUrl}
+                      alt={`Valid ID from ${b.renter}`}
+                      className="h-32 w-32 cursor-zoom-in rounded-sm object-cover"
+                    />
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /**
  * The "Bookings & Payments" section (admin.html → BookingsSection).
  *
@@ -105,6 +258,8 @@ export function BookingsManager({
     src: string;
     caption: string;
   } | null>(null);
+  // The booking whose full details are open in the details modal.
+  const [detailView, setDetailView] = useState<AdminBooking | null>(null);
   const [adding, setAdding] = useState(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [confirmRefundId, setConfirmRefundId] = useState<string | null>(null);
@@ -168,18 +323,29 @@ export function BookingsManager({
             return (
               <div
                 key={b.id}
-                className="flex flex-wrap items-center gap-3.5 rounded-lg border border-border-soft bg-background-card p-4 shadow-card"
+                role="button"
+                tabIndex={0}
+                onClick={() => setDetailView(b)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setDetailView(b);
+                  }
+                }}
+                aria-label={`View full details for ${b.renter}'s booking`}
+                className="flex cursor-pointer flex-wrap items-center gap-3.5 rounded-lg border border-border-soft bg-background-card p-4 shadow-card transition-colors hover:border-brand-primary focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-brand-primary/35"
               >
                 {/* Payment-proof thumbnail (tap to zoom) or an "no proof" tile. */}
                 {b.proofUrl ? (
                   <button
                     type="button"
-                    onClick={() =>
+                    onClick={(e) => {
+                      e.stopPropagation(); // don't also open the details modal
                       setLightbox({
                         src: b.proofUrl!,
                         caption: `Payment proof — ${b.renter}`,
-                      })
-                    }
+                      });
+                    }}
                     aria-label={`View payment proof from ${b.renter}`}
                     className="flex-none rounded-sm border border-border-soft focus-visible:shadow-focus"
                   >
@@ -202,12 +368,13 @@ export function BookingsManager({
                 {b.idPhotoUrl ? (
                   <button
                     type="button"
-                    onClick={() =>
+                    onClick={(e) => {
+                      e.stopPropagation(); // don't also open the details modal
                       setLightbox({
                         src: b.idPhotoUrl!,
                         caption: `Valid ID — ${b.renter}`,
-                      })
-                    }
+                      });
+                    }}
                     aria-label={`View valid ID from ${b.renter}`}
                     className="relative flex-none rounded-sm border border-border-soft focus-visible:shadow-focus"
                   >
@@ -275,8 +442,12 @@ export function BookingsManager({
 
                 {/* Actions. A manual booking has no proof — its "verify" is a
                     plain Mark-paid (same action; there are no add-ons whose
-                    stock could shift), and "Mark invalid" makes no sense. */}
-                <div className="flex flex-wrap items-center gap-2">
+                    stock could shift), and "Mark invalid" makes no sense.
+                    stopPropagation so acting on a card never opens its details. */}
+                <div
+                  className="flex flex-wrap items-center gap-2"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   {b.status !== "verified" && (b.proofUrl || b.manual) ? (
                     <button
                       type="button"
@@ -404,6 +575,16 @@ export function BookingsManager({
           accessories={accessories}
           bookings={bookings}
           onClose={() => setAdding(false)}
+        />
+      ) : null}
+
+      {/* Full booking details — opened by clicking a card. The lightbox below
+          sits at a higher z-index so images can still open over it. */}
+      {detailView ? (
+        <BookingDetailsModal
+          booking={detailView}
+          onClose={() => setDetailView(null)}
+          onViewImage={(src, caption) => setLightbox({ src, caption })}
         />
       ) : null}
 
