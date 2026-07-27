@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -8,6 +9,12 @@ import { SiteFooter } from "@/components/site-footer";
 // The session comes from cookies, so anything under here is per-request, never
 // statically cached.
 export const dynamic = "force-dynamic";
+
+// Every protected admin page inherits this: never index the dashboard (robots.ts
+// also disallows /admin — this is the in-page backstop).
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 /**
  * Guard + shell for every protected admin page.

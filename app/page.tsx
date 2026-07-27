@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { SectionTitle } from "@/components/section-title";
 import { FaqSection } from "@/components/faq-section";
+import { StructuredData } from "@/components/structured-data";
 import type { DressDetail } from "@/components/dress-detail-modal";
 import type { CustomerAccessory } from "@/components/accessory-picker";
 import type { PaymentOption } from "@/components/reserve/payment-step";
@@ -215,6 +216,10 @@ export default async function Home() {
   // from a DressCard — never a route.
   return (
     <div id="top">
+      {/* LocalBusiness structured data — invisible to shoppers, read by Google
+          to power rich local-search results. Renders as a JSON-LD <script>. */}
+      <StructuredData />
+
       <SiteHeader />
 
       <Hero />

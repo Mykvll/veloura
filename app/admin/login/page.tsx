@@ -1,9 +1,17 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { LoginForm } from "./login-form";
 
 // The session lives in cookies, so this page must never be statically cached.
 export const dynamic = "force-dynamic";
+
+// Keep the admin login out of search results (robots.ts also disallows /admin;
+// this noindex tag is the belt-and-suspenders in case the URL is crawled anyway).
+export const metadata: Metadata = {
+  title: "Admin sign in",
+  robots: { index: false, follow: false },
+};
 
 /**
  * Admin login page (/admin/login).
