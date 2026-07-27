@@ -107,6 +107,12 @@ export const metadata: Metadata = {
     follow: true,
     googleBot: { index: true, follow: true },
   },
+  // Google Search Console ownership verification (HTML-tag method). Next renders
+  // this as <meta name="google-site-verification" ...>; keep it in place so the
+  // property stays verified.
+  verification: {
+    google: "HoVrRlkj3x9toNAKc_jHSyuObTwL-f1oqsdA3Nc8a-o",
+  },
 };
 
 export default function RootLayout({
