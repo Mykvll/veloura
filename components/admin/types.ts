@@ -76,6 +76,10 @@ export type AdminBooking = {
   dressId: string | null;
   /** Contact number; manual bookings don't carry one (the DM has it). */
   contact: string | null;
+  /** Delivery address the customer typed; null for manual bookings. */
+  address: string | null;
+  /** Which payment channel the customer chose (e.g. "GCash"); null if none. */
+  paymentMethod: string | null;
   /** Rental dates + preferred delivery time (ISO days / "10:00 AM"). */
   start: string | null;
   end: string | null;
