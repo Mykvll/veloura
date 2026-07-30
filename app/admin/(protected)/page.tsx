@@ -16,6 +16,7 @@ import type {
   AnalyticsData,
   CalendarRental,
   CalendarFitting,
+  AdminFitting,
 } from "@/components/admin/types";
 
 // Session-based + always-fresh: the list must reflect writes immediately.
@@ -152,7 +153,9 @@ export default async function AdminDashboardPage() {
   // slot. (Rentals for the calendar are derived from the Bookings rows below.)
   const { data: fittingRows } = await supabase
     .from("bookings")
-    .select("id, dress_name, renter_name, fitting_date, fitting_time")
+    .select(
+      "id, dress_id, dress_name, renter_name, contact, fitting_date, fitting_time, created_at",
+    )
     .eq("type", "fitting")
     .in("payment_status", ["pending", "verified"])
     .not("fitting_date", "is", null);
@@ -415,6 +418,19 @@ export default async function AdminDashboardPage() {
     time: f.fitting_time,
   }));
 
+  // The same active fittings shaped for the Bookings section: gold cards the
+  // admin can reschedule / cancel, interleaved with the rental cards.
+  const adminFittings: AdminFitting[] = (fittingRows ?? []).map((f) => ({
+    id: f.id,
+    name: f.renter_name,
+    dress: f.dress_name ?? "Dress",
+    dressId: f.dress_id,
+    contact: f.contact,
+    date: f.fitting_date as string,
+    time: f.fitting_time,
+    createdAt: f.created_at,
+  }));
+
   const verifiedCount = verified?.length ?? 0;
   const loggedCount = pastRentals?.length ?? 0;
   // "Per rental" = every rental that earned money: verified + logged.
@@ -507,6 +523,7 @@ export default async function AdminDashboardPage() {
         {/* historyDressOptions doubles as the manual-booking dress picker. */}
         <BookingsManager
           bookings={bookingRows}
+          fittings={adminFittings}
           dresses={historyDressOptions}
           accessories={manualAccessoryOptions}
         />
