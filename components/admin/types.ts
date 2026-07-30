@@ -209,6 +209,34 @@ export type CalendarFitting = {
   time: string | null;
 };
 
+/**
+ * A fitting appointment as the Bookings section works with it. Fittings are
+ * `bookings` rows (type='fitting') — an in-store try-on with no payment to
+ * verify. They render as gold cards in the Bookings list (interleaved with
+ * rentals) and as gold dots on the Booking Calendar, and never block rental
+ * dates. Compared with CalendarFitting this carries the extra fields the list +
+ * editor need (contact, the dress id to prefill the reschedule picker, and the
+ * created-at used to interleave with rentals).
+ */
+export type AdminFitting = {
+  id: string;
+  /** Client's name (bookings.renter_name). */
+  name: string;
+  /** Dress being fitted — snapshotted name, and its id (null if the dress was
+   *  deleted) so the reschedule editor can pre-select it. */
+  dress: string;
+  dressId: string | null;
+  /** Contact number; optional for admin-created fittings. */
+  contact: string | null;
+  /** ISO "YYYY-MM-DD" of the appointment. */
+  date: string;
+  /** Slot label, e.g. "4:00 PM". */
+  time: string | null;
+  /** When the booking was made — used to interleave fittings with rentals in
+   *  the Bookings list (newest booked first). */
+  createdAt: string | null;
+};
+
 /** The sizes a dress can be offered in, in display order. */
 export const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL"] as const;
 

@@ -9,6 +9,7 @@ import {
   ImageOff,
   PenLine,
   RotateCcw,
+  Ruler,
   X,
 } from "lucide-react";
 import { niceDate } from "@/lib/reserve";
@@ -18,13 +19,15 @@ import {
   deleteBooking,
   markBookingRefunded,
 } from "@/app/admin/(protected)/booking-actions";
+import { cancelFitting } from "@/app/admin/(protected)/fitting-actions";
 import { SectionTitle } from "@/components/section-title";
 import {
   ManualBookingModal,
   type ManualBookingDressOption,
   type ManualBookingAccessoryOption,
 } from "./manual-booking-modal";
-import type { AdminBooking } from "./types";
+import { FittingEditorModal } from "./fitting-editor-modal";
+import type { AdminBooking, AdminFitting } from "./types";
 
 /**
  * Status → label + colour + icon. Gold for "awaiting", olive for verified,
@@ -242,11 +245,15 @@ function BookingDetailsModal({
  */
 export function BookingsManager({
   bookings,
+  fittings,
   dresses,
   accessories,
 }: {
   bookings: AdminBooking[];
-  /** The catalogue, for the Add-manual-booking modal's dress picker. */
+  /** Upcoming fitting appointments — shown as gold cards interleaved with the
+   *  rental cards, and editable/cancellable from here. */
+  fittings: AdminFitting[];
+  /** The catalogue, for the Add-manual-booking + Add-fitting dress pickers. */
   dresses: ManualBookingDressOption[];
   /** Add-ons (with their at-capacity days) for the manual-booking picker. */
   accessories: ManualBookingAccessoryOption[];
@@ -261,6 +268,15 @@ export function BookingsManager({
   // The booking whose full details are open in the details modal.
   const [detailView, setDetailView] = useState<AdminBooking | null>(null);
   const [adding, setAdding] = useState(false);
+  // The fitting editor: "new" to add one, an AdminFitting to reschedule it, or
+  // null when closed.
+  const [fittingEdit, setFittingEdit] = useState<AdminFitting | "new" | null>(
+    null,
+  );
+  // Which fitting card is showing its inline "Cancel …?" confirm, and which is
+  // mid-cancel (its own busy flag, separate from the rental actions').
+  const [cancelFitId, setCancelFitId] = useState<string | null>(null);
+  const [fitBusy, setFitBusy] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [confirmRefundId, setConfirmRefundId] = useState<string | null>(null);
   // Which card+button has an action in flight — the kind lets each button show
@@ -292,10 +308,41 @@ export function BookingsManager({
     });
   }
 
+  /** Cancel (delete) a fitting after its inline confirm. */
+  function runCancelFit(id: string) {
+    setError(null);
+    setFitBusy(id);
+    startTransition(async () => {
+      const res = await cancelFitting(id);
+      setFitBusy(null);
+      if (res.error) {
+        setError(res.error);
+        return;
+      }
+      setCancelFitId(null);
+      router.refresh();
+    });
+  }
+
+  // Rentals and fittings share one list, newest booked first (their created_at).
+  // Each renders its own card kind; a fitting has no payment to verify, so it's
+  // never in the same visual family as a rental card.
+  type Item =
+    | { kind: "rental"; sort: string; b: AdminBooking }
+    | { kind: "fitting"; sort: string; f: AdminFitting };
+  const items: Item[] = [
+    ...bookings.map(
+      (b): Item => ({ kind: "rental", sort: b.bookedAt ?? "", b }),
+    ),
+    ...fittings.map(
+      (f): Item => ({ kind: "fitting", sort: f.createdAt ?? "", f }),
+    ),
+  ].sort((a, b) => b.sort.localeCompare(a.sort));
+
   return (
     <div>
       {/* Centered gold section title, like every admin section. */}
-      <SectionTitle subtitle="Verify payment proofs — completed rentals move to Rental History automatically">
+      <SectionTitle subtitle="Rentals & fittings — completed rentals move to Rental History automatically">
         Bookings
       </SectionTitle>
 
@@ -304,12 +351,91 @@ export function BookingsManager({
       ) : null}
 
       <div className="mt-8 flex flex-col gap-3.5">
-        {bookings.length === 0 ? (
+        {items.length === 0 ? (
           <div className="rounded-lg border border-border-soft bg-background-card p-6 text-center text-body-sm text-text-secondary">
             No active bookings — completed rentals live in Rental History.
           </div>
         ) : (
-          bookings.map((b) => {
+          items.map((item) => {
+            // Fitting appointment — a gold card, no payment to verify. Reschedule
+            // opens the editor pre-filled; Cancel deletes it (inline confirm).
+            if (item.kind === "fitting") {
+              const f = item.f;
+              return (
+                <div
+                  key={f.id}
+                  className="flex flex-wrap items-center gap-3.5 rounded-lg border border-border-accent bg-background-card p-4 shadow-card"
+                >
+                  {/* Gold icon tile stands in for the missing proof thumbnail. */}
+                  <span className="flex h-16 w-16 flex-none items-center justify-center rounded-sm bg-brand-primary text-text-on-primary">
+                    <Ruler className="h-5 w-5" />
+                  </span>
+
+                  <div className="min-w-0 flex-1 basis-56">
+                    <div className="text-label-base uppercase tracking-wide text-text-heading">
+                      {f.name} · {f.dress}
+                    </div>
+                    <div className="mt-0.5 text-body-sm text-text-secondary">
+                      {niceDate(f.date)}
+                      {f.time ? ` · ${f.time}` : ""}
+                      {f.contact ? ` · ${f.contact}` : ""}
+                    </div>
+                    <div className="mt-1.5 inline-flex items-center gap-1.5 text-label-sm uppercase tracking-wide text-text-accent">
+                      <Ruler className="h-3.5 w-3.5" />
+                      Fitting appointment — no dates blocked
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setError(null);
+                        setFittingEdit(f);
+                      }}
+                      className="inline-flex min-h-tap items-center justify-center rounded-pill border border-border-accent bg-white px-3.5 text-label-sm uppercase tracking-wide text-text-accent transition-colors hover:bg-background-panel"
+                    >
+                      Reschedule
+                    </button>
+
+                    {cancelFitId === f.id ? (
+                      <span className="inline-flex flex-wrap items-center gap-2 rounded-md bg-background-panel px-3 py-2 text-body-sm text-text-primary">
+                        Cancel {f.name}&apos;s fitting?
+                        <button
+                          type="button"
+                          onClick={() => runCancelFit(f.id)}
+                          disabled={fitBusy === f.id}
+                          className="inline-flex min-h-tap items-center justify-center rounded-pill bg-state-error px-3.5 text-label-sm uppercase tracking-wide text-text-on-primary transition-colors disabled:opacity-60"
+                        >
+                          {fitBusy === f.id ? "Cancelling…" : "Yes, cancel"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setCancelFitId(null)}
+                          disabled={fitBusy === f.id}
+                          className="inline-flex min-h-tap items-center justify-center rounded-pill border border-border-soft bg-white px-3.5 text-label-sm uppercase tracking-wide text-text-primary transition-colors hover:bg-background-panel disabled:opacity-60"
+                        >
+                          Keep
+                        </button>
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setError(null);
+                          setCancelFitId(f.id);
+                        }}
+                        className="inline-flex min-h-tap items-center justify-center rounded-pill border border-border-soft bg-white px-3.5 text-label-sm uppercase tracking-wide text-state-error transition-colors hover:bg-background-panel"
+                      >
+                        Cancel fitting
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            }
+
+            const b = item.b;
             let meta = STATUS_META[b.status] ?? STATUS_META.pending;
             // A manual booking has no proof to inspect, so its states read as
             // plain money facts, not verification steps.
@@ -553,19 +679,38 @@ export function BookingsManager({
           })
         )}
 
-        {/* Add manual booking tile — same dashed add-tile as everywhere else. */}
-        <button
-          type="button"
-          onClick={() => setAdding(true)}
-          className="flex min-h-[110px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border-strong bg-background-card text-text-secondary transition duration-fast ease-soft hover:border-brand-primary hover:text-text-heading focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-brand-primary/35"
-        >
-          <span className="flex h-11 w-11 items-center justify-center rounded-pill bg-brand-primary text-2xl leading-none text-text-on-primary">
-            +
-          </span>
-          <span className="text-label-base uppercase tracking-label">
-            Add manual booking
-          </span>
-        </button>
+        {/* Two dashed add-tiles side by side (stacked on narrow screens): a
+            manual rental, and a fitting appointment. */}
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="flex min-h-[110px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border-strong bg-background-card text-text-secondary transition duration-fast ease-soft hover:border-brand-primary hover:text-text-heading focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-brand-primary/35"
+          >
+            <span className="flex h-11 w-11 items-center justify-center rounded-pill bg-brand-primary text-2xl leading-none text-text-on-primary">
+              +
+            </span>
+            <span className="text-label-base uppercase tracking-label">
+              Add manual booking
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setError(null);
+              setFittingEdit("new");
+            }}
+            className="flex min-h-[110px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border-accent bg-background-card text-text-secondary transition duration-fast ease-soft hover:border-brand-primary hover:text-text-heading focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-brand-primary/35"
+          >
+            <span className="flex h-11 w-11 items-center justify-center rounded-pill bg-brand-primary text-text-on-primary">
+              <Ruler className="h-[18px] w-[18px]" />
+            </span>
+            <span className="text-label-base uppercase tracking-label">
+              Add fitting
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* Add-manual-booking modal — fresh instance each time it opens. */}
@@ -575,6 +720,19 @@ export function BookingsManager({
           accessories={accessories}
           bookings={bookings}
           onClose={() => setAdding(false)}
+        />
+      ) : null}
+
+      {/* Fitting editor — "new" to add, or an AdminFitting to reschedule/edit.
+          It reads the same rentals (for the dress's out-days) and fittings (for
+          the double-booking notice) the list shows. */}
+      {fittingEdit ? (
+        <FittingEditorModal
+          dresses={dresses}
+          rentals={bookings}
+          fittings={fittings}
+          editing={fittingEdit === "new" ? null : fittingEdit}
+          onClose={() => setFittingEdit(null)}
         />
       ) : null}
 
