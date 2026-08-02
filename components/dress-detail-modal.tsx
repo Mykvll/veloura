@@ -15,7 +15,7 @@ import { FittingForm } from "./reserve/fitting-form";
 import { PaymentStep, type PaymentOption } from "./reserve/payment-step";
 import { niceDate, FITTING_LOCATION } from "@/lib/reserve";
 
-/** A hold recovered from sessionStorage after a refresh, to reopen payment. */
+/** A hold recovered from localStorage (refresh or tab reopen), to reopen payment. */
 export type ResumeHold = {
   bookingId: string;
   date: string;

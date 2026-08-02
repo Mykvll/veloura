@@ -1,10 +1,17 @@
-// Per-tab persistence of the in-progress rent hold, so an accidental page
-// refresh can resume the payment step with an uninterrupted countdown.
+// Per-browser persistence of the in-progress rent hold, so an accidental page
+// refresh — OR closing the tab and reopening the site — can resume the payment
+// step with an uninterrupted countdown.
 // See docs/security-enhancement/payment-window-refresh.md.
 //
-// sessionStorage (not localStorage): survives a refresh, clears when the tab
-// closes — the right scope for a 10-minute hold. The countdown itself is always
-// derived from the server's hold_expires_at, never from anything stored here.
+// localStorage (not localStorage): localStorage is wiped the instant the tab
+// closes, which is exactly what happens when a customer leaves for the GCash app
+// on mobile and the browser drops the backgrounded tab — they'd lose a live hold
+// and their date even though they were mid-payment. localStorage survives that,
+// and a stale entry is harmless: the resume path in collection-gallery.tsx always
+// re-validates against the server via get_hold_status and clears anything that
+// isn't still a live `hold` (and clearHold() runs on submit/cancel/expire). The
+// countdown itself is always derived from the server's hold_expires_at, never
+// from anything stored here.
 
 const KEY = "veloura.activeHold";
 
@@ -23,7 +30,7 @@ export type StoredHold = {
 
 export function saveHold(hold: StoredHold): void {
   try {
-    sessionStorage.setItem(KEY, JSON.stringify(hold));
+    localStorage.setItem(KEY, JSON.stringify(hold));
   } catch {
     // Private-mode / storage-disabled: resume just won't be available. Non-fatal.
   }
@@ -31,7 +38,7 @@ export function saveHold(hold: StoredHold): void {
 
 export function loadHold(): StoredHold | null {
   try {
-    const raw = sessionStorage.getItem(KEY);
+    const raw = localStorage.getItem(KEY);
     return raw ? (JSON.parse(raw) as StoredHold) : null;
   } catch {
     return null;
@@ -45,7 +52,7 @@ export function patchHold(patch: Partial<StoredHold>): void {
 
 export function clearHold(): void {
   try {
-    sessionStorage.removeItem(KEY);
+    localStorage.removeItem(KEY);
   } catch {
     // ignore
   }
