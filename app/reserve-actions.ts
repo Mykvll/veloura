@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { fittingSlots } from "@/lib/reserve";
 import { notifyOwner } from "@/lib/notify/telegram";
@@ -303,11 +304,17 @@ export async function attachRentPayment(
     return { error: "Couldn't submit your payment. Please try again." };
   }
 
-  // Ping the owner on Telegram — best-effort, never awaited (see notifyOwner).
+  // Ping the owner on Telegram — best-effort. Deferred with `after()` so it runs
+  // once the response is flushed WITHOUT the serverless function being torn down
+  // first: a bare `void notifyOwner(...)` can be dropped when Vercel freezes the
+  // instance after the action returns, so the ping never fires. `after` keeps
+  // the function alive until the send completes (notifyOwner still swallows its
+  // own errors, so a Telegram failure never affects the booking).
   // `summary` is present only on the fresh hold→pending transition, so a client
   // retry (already-pending) won't re-notify.
   if (res.summary) {
-    void notifyOwner(rentNotification(res.summary));
+    const summary = res.summary;
+    after(() => notifyOwner(rentNotification(summary)));
   }
 
   revalidatePath("/");
@@ -403,9 +410,13 @@ export async function createFittingBooking(
     return { error: "Please check your details and try again." };
   }
 
-  // Ping the owner on Telegram — best-effort, never awaited (see notifyOwner).
+  // Ping the owner on Telegram — best-effort, deferred with `after()` so it
+  // survives the serverless function being frozen after the action returns
+  // (a bare `void notifyOwner(...)` can be dropped mid-flight; see the rent
+  // flow above for the full reasoning).
   if (res.summary) {
-    void notifyOwner(fittingNotification(res.summary));
+    const summary = res.summary;
+    after(() => notifyOwner(fittingNotification(summary)));
   }
 
   // A new pending fitting occupies its slot — refresh so the page reflects it.
