@@ -24,9 +24,10 @@ import { loadHold, clearHold } from "@/lib/hold-storage";
  * boolean + a copy of the dress. Tapping a card sets `openId`; the modal reads
  * the matching dress straight out of the `dresses` array we already have.
  *
- * REFRESH RESUME: on mount we check sessionStorage for an in-progress payment
- * hold (see payment-window-refresh.md). If one is still live server-side, we
- * reopen its dress straight on the payment step with the countdown resumed.
+ * RESUME: on mount we check localStorage for an in-progress payment hold (see
+ * payment-window-refresh.md) — so a refresh OR a tab close + reopen can pick it
+ * back up. If one is still live server-side, we reopen its dress straight on the
+ * payment step with the countdown resumed.
  */
 export function CollectionGallery({
   dresses,
