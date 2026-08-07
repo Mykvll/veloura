@@ -35,6 +35,22 @@ const nextConfig: NextConfig = {
         pathname: "/storage/v1/object/public/**",
       },
     ],
+    // --- Image-transformation budget ---
+    // Vercel counts one billable transformation per UNIQUE (source × width ×
+    // quality × format), then caches it. Next's defaults expose 8 device sizes
+    // + 7 image sizes, so every browser DPR/viewport combo can request a
+    // different width and mint a separate transformation. This is a mobile-first
+    // rental site with phone-shot portrait photos, so we trim the width buckets
+    // to a handful of shared widths — de-duplicating requests collapses ~10
+    // distinct widths per dress photo down to ~4, cutting the monthly count.
+    // (formats defaults to ['image/webp'] and qualities to [75] already, so the
+    // only remaining multiplier is the width list below.)
+    deviceSizes: [640, 828, 1080, 1920], // was [640,750,828,1080,1200,1920,2048,3840]; drop redundant + 4K-tier widths
+    imageSizes: [64, 128, 256], // was [32,48,64,96,128,256,384]; covers logos (44/110px) + 80px gallery thumbs at 1x/2x
+    // Keep each unique transformation cached ~31 days so the same variant is
+    // billed at most once per month; dress photos change via new upload paths,
+    // not in-place edits, so a long TTL is safe.
+    minimumCacheTTL: 2678400,
   },
   async headers() {
     return [
