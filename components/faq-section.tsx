@@ -42,7 +42,7 @@ const FAQS: { Icon: LucideIcon; q: string; a: string }[] = [
   {
     Icon: CalendarCheck,
     q: "Is fitting available?",
-    a: `Yes, by appointment only — ₱200 per session for the fitting day at ${FITTING_LOCATION}. Weekdays 4:00 & 7:00 PM; weekends 1:00, 3:00, 5:00, 7:00 & 9:00 PM. Bring one (1) valid ID.`,
+    a: `Yes, by appointment only and free of charge, at ${FITTING_LOCATION}. Weekdays 4:00 & 7:00 PM; weekends 1:00, 3:00, 5:00, 7:00 & 9:00 PM. Bring one (1) valid ID.`,
   },
   {
     Icon: PackageCheck,
