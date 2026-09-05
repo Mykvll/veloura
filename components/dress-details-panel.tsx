@@ -130,7 +130,7 @@ export function DressDetailsPanel({
 
       <p className="text-body-sm text-text-secondary">
         To reserve, the full rental fee is paid up front — only paid reservations
-        secure the rental date. Fitting by appointment (₱200 per session). No
+        secure the rental date. Fitting by appointment, free of charge. No
         tailoring, cutting, or alterations.
       </p>
 

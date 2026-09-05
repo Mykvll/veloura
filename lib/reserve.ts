@@ -66,8 +66,8 @@ export const DELIVERY_TIMES = [
   "5:00 PM",
 ];
 
-/** The fitting fee and the optional parking add-on (pesos), from the design. */
-export const FITTING_FEE = 200;
+/** The optional parking add-on (pesos), from the design. Fittings themselves
+ *  are free — parking is the only thing a fitting can cost. */
 export const PARKING_FEE = 50;
 
 /** Where fittings happen (design copy). */

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/supabase/require-admin";
-import { fittingSlots, FITTING_FEE } from "@/lib/reserve";
+import { fittingSlots } from "@/lib/reserve";
 
 type ActionResult = { error: string | null };
 
@@ -77,9 +77,10 @@ async function prepareFitting(
 
 /**
  * Create one fitting appointment. `manual: true` marks it admin-entered (a
- * customer fitting is false); the amount is snapshotted as the standard fitting
- * fee. Fittings never reach 'verified' (there's no payment proof), so they stay
- * 'pending' and are excluded from revenue analytics.
+ * customer fitting is false); the amount is 0 because fittings are free (an
+ * admin fitting never takes the parking add-on either). Fittings never reach
+ * 'verified' (there's no payment proof), so they stay 'pending' and are
+ * excluded from revenue analytics.
  */
 export async function createFitting(input: FittingInput): Promise<ActionResult> {
   const supabase = await createClient();
@@ -101,7 +102,7 @@ export async function createFitting(input: FittingInput): Promise<ActionResult> 
     fitting_date: input.date,
     fitting_time: input.time,
     parking: false, // admin fittings don't take the parking add-on
-    amount: FITTING_FEE,
+    amount: 0, // fittings are free
   });
   if (error) return { error: error.message };
 

@@ -6,7 +6,6 @@ import {
   fittingSlots,
   isWeekend,
   niceDate,
-  FITTING_FEE,
   PARKING_FEE,
   FITTING_LOCATION,
 } from "@/lib/reserve";
@@ -125,7 +124,8 @@ export function FittingForm({
     });
   }
 
-  const totalFee = FITTING_FEE + (parking ? PARKING_FEE : 0);
+  // The fitting itself is free — parking is the only thing due on the day.
+  const dueOnTheDay = parking ? PARKING_FEE : 0;
 
   return (
     <div className="flex flex-col gap-4">
@@ -199,6 +199,9 @@ export function FittingForm({
         <div className="flex min-h-tap items-center rounded-sm border border-dashed border-border-strong bg-background-panel px-4 py-2 text-body-base text-text-primary">
           {FITTING_LOCATION}
         </div>
+        <p className="mt-1.5 text-body-sm text-text-secondary">
+          Fittings are free — no charge for the session.
+        </p>
       </div>
 
       <div>
@@ -245,15 +248,54 @@ export function FittingForm({
           </div>
           <p className="text-body-sm text-text-secondary">
             We reserve a slot near Harbour Park Residences in advance (₱
-            {PARKING_FEE}, added to your fitting fee). Please arrive on time.
+            {PARKING_FEE}, paid on the day). Please arrive on time.
           </p>
         </div>
       ) : null}
 
       <p className="text-body-sm text-text-secondary">
-        Fitting fee ₱{FITTING_FEE}, by appointment only. Please bring one (1)
-        valid ID for condominium visitor requirements.
+        By appointment only. Please bring one (1) valid ID for condominium
+        visitor requirements.
       </p>
+
+      {/* Cost summary — mirrors the v2 prototype's fitting SummaryRail: with
+          parking it's the ₱50 slot plus a "Due on the day" total; without it a
+          single free row, so a ₱0 total is never rendered. */}
+      <div className="flex flex-col gap-2 border-t border-border-soft pt-3">
+        {parking ? (
+          <>
+            <div className="flex items-baseline justify-between gap-2.5">
+              <span className="text-body-base text-text-primary">
+                Parking ({vehicle.toLowerCase()})
+              </span>
+              <span className="text-price-base text-text-accent">
+                ₱{PARKING_FEE.toLocaleString("en-PH")}
+              </span>
+            </div>
+            <div className="flex items-baseline justify-between gap-2.5 border-t border-border-strong pt-2">
+              <span className="text-label-base uppercase tracking-label text-text-heading">
+                Due on the day
+              </span>
+              <span className="text-price-base text-text-accent">
+                ₱{dueOnTheDay.toLocaleString("en-PH")}
+              </span>
+            </div>
+          </>
+        ) : (
+          <div className="flex items-baseline justify-between gap-2.5">
+            <span className="flex flex-col">
+              <span className="text-body-base text-text-primary">Fitting</span>
+              <span className="text-body-sm text-text-secondary">
+                no charge for the session
+              </span>
+            </span>
+            <span className="text-price-base text-text-accent">Free</span>
+          </div>
+        )}
+        <p className="text-body-sm text-text-secondary">
+          Nothing to pay now — we hold the slot for you.
+        </p>
+      </div>
 
       {error ? <p className="text-body-sm text-state-error">{error}</p> : null}
 
@@ -265,7 +307,9 @@ export function FittingForm({
       >
         {isPending
           ? "Booking…"
-          : `Book this fitting · ₱${totalFee.toLocaleString("en-PH")}`}
+          : parking
+            ? `Book this fitting · ₱${PARKING_FEE.toLocaleString("en-PH")} parking`
+            : "Book this fitting"}
       </button>
     </div>
   );
