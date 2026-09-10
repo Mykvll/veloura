@@ -8,6 +8,7 @@ import { DressDetailsPanel, type DressSize } from "./dress-details-panel";
 import type { CustomerAccessory } from "./accessory-picker";
 import {
   AvailabilityCalendar,
+  sizeIsFreeOn,
   type BlockedDate,
 } from "./availability-calendar";
 import { RentForm, type RentPaymentContext } from "./reserve/rent-form";
@@ -62,6 +63,30 @@ export type DressDetail = {
  * Esc-to-close, click-outside, and body scroll-lock for free (it's the same
  * primitive the admin editors use).
  */
+/**
+ * "Free on Sep 17 in L. M is taken that day." — one plain line telling the
+ * renter which garments their chosen date can actually take, so a dotted chip
+ * is never a mystery. Only rendered for dresses with more than one size.
+ */
+function freeSizeLabel(
+  dress: DressDetail,
+  blocked: BlockedDate[],
+  day: string,
+): string {
+  const free = dress.sizes
+    .map((s) => s.size)
+    .filter((s) => sizeIsFreeOn(blocked, dress.id, s, day));
+  const taken = dress.sizes
+    .map((s) => s.size)
+    .filter((s) => !free.includes(s));
+  const when = niceDate(day);
+  if (free.length === 0) return `Every size is taken on ${when}.`;
+  if (taken.length === 0) return `Every size is free on ${when}.`;
+  return `Free on ${when} in ${free.join(", ")}. ${taken.join(", ")} ${
+    taken.length === 1 ? "is" : "are"
+  } taken that day.`;
+}
+
 export function DressDetailModal({
   dress,
   accessories,
@@ -95,6 +120,11 @@ export function DressDetailModal({
   );
   const [mode, setMode] = useState<"rent" | "fitting">("rent");
   const [date, setDate] = useState<string | null>(resume?.date ?? null);
+  // WHICH GARMENT. Each size is its own dress on the rack, so the size decides
+  // what the calendar is about and what actually gets reserved. It is picked on
+  // the details step and carried into the date step, where it can still be
+  // changed — switching it re-renders the calendar against the other unit.
+  const [size, setSize] = useState<string>(dress.sizes[0]?.size ?? "");
 
   // The hold context carried into the payment step: the held booking id + the
   // server-anchored expiry that drives the countdown. Seeded from `resume` when
@@ -255,14 +285,69 @@ export function DressDetailModal({
                   ← Back to details
                 </button>
                 <div className="grid grid-cols-1 gap-10 md:grid-cols-2">
+                  <div className="flex flex-col gap-4">
+                    {/* SIZE PICKER ABOVE THE CALENDAR. Availability is per
+                        garment now, so the calendar underneath is about the
+                        chosen size — switching re-renders it in place. Hidden
+                        for single-size dresses and for fittings, which need any
+                        one garment of the dress rather than a specific unit. */}
+                    {mode === "rent" && dress.sizes.length > 1 ? (
+                      <div>
+                        <div className="mb-2 text-label-base uppercase tracking-label text-text-heading">
+                          Size{" "}
+                          <span className="text-body-sm normal-case tracking-normal text-text-secondary">
+                            (one garment per size)
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {dress.sizes.map((s) => {
+                            const isActive = s.size === size;
+                            // A size taken on the chosen date keeps its dot but
+                            // stays selectable — you still need its measurements.
+                            const taken =
+                              !!date &&
+                              !sizeIsFreeOn(blockedDates, dress.id, s.size, date);
+                            return (
+                              <button
+                                key={s.size}
+                                type="button"
+                                onClick={() => setSize(s.size)}
+                                aria-pressed={isActive}
+                                className={`relative min-h-tap min-w-tap rounded-pill border px-4 text-label-sm uppercase tracking-wide transition-fast ${
+                                  isActive
+                                    ? "border-brand-primary bg-brand-primary text-text-on-primary"
+                                    : "border-border-soft bg-background-card text-text-primary hover:border-border-strong"
+                                }`}
+                              >
+                                {s.size}
+                                {taken ? (
+                                  <span
+                                    aria-label="taken on the chosen date"
+                                    className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-state-error"
+                                  />
+                                ) : null}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        {date ? (
+                          <p className="mt-2 text-body-sm text-text-secondary">
+                            {freeSizeLabel(dress, blockedDates, date)}
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
                   <AvailabilityCalendar
                     blocked={blockedDates}
                     dressId={dress.id}
                     dressName={dress.name}
+                    size={size}
+                    sizes={dress.sizes.map((s) => s.size)}
                     mode={mode}
                     selected={date}
                     onSelect={setDate}
                   />
+                  </div>
                   {mode === "rent" ? (
                     <RentForm
                       dress={{
@@ -270,6 +355,7 @@ export function DressDetailModal({
                         name: dress.name,
                         price: dress.price,
                       }}
+                      size={size}
                       accessories={accessories}
                       date={date}
                       onContinue={(data) => {
@@ -334,6 +420,8 @@ export function DressDetailModal({
                   <DressDetailsPanel
                     sizes={dress.sizes}
                     price={dress.price}
+                    size={size}
+                    onSizeChange={setSize}
                     onReserve={() => goToDate("rent")}
                     onFitting={() => goToDate("fitting")}
                   />

@@ -44,6 +44,9 @@ export type ManualBookingDressOption = {
   name: string;
   /** Rental price — the booking's amount is this plus any add-ons. */
   price: number;
+  /** The sizes this dress is offered in. Each one is a separate garment, so the
+   *  admin books a (dress, size) unit — not just a dress. */
+  sizes: string[];
 };
 
 /**
@@ -91,6 +94,9 @@ export function ManualBookingModal({
   const router = useRouter();
 
   const [dressId, setDressId] = useState("");
+  // WHICH GARMENT. Availability is per unit, so the calendar below is about
+  // (dress, size) — changing either clears the picked range.
+  const [size, setSize] = useState("");
   const [renterName, setRenterName] = useState("");
   const [selStart, setSelStart] = useState<string | null>(null);
   const [selEnd, setSelEnd] = useState<string | null>(null);
@@ -107,15 +113,16 @@ export function ManualBookingModal({
   } | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  // The chosen dress's days-with-a-customer (start..end of every active
-  // rental) and its wash days (end + 1). A wash day that's also another
-  // rental's day counts as taken — the harder rule wins.
+  // The chosen GARMENT's days-with-a-customer (start..end of every active
+  // rental of this dress in this size) and its wash days (end + 1). A wash day
+  // that's also another rental's day counts as taken — the harder rule wins.
+  // Other sizes of the same dress are different garments and never appear here.
   const { taken, wash } = useMemo(() => {
     const taken = new Set<string>();
     const washAll = new Set<string>();
-    if (dressId) {
+    if (dressId && size) {
       for (const b of bookings) {
-        if (b.dressId !== dressId) continue;
+        if (b.dressId !== dressId || b.size !== size) continue;
         if (b.status !== "pending" && b.status !== "verified") continue;
         if (!b.start || !b.end) continue;
         for (let d = b.start; d <= b.end; d = addDays(d, 1)) taken.add(d);
@@ -124,7 +131,7 @@ export function ManualBookingModal({
     }
     const wash = new Set([...washAll].filter((w) => !taken.has(w)));
     return { taken, wash };
-  }, [bookings, dressId]);
+  }, [bookings, dressId, size]);
 
   /** Range picking: start on any open day; extend forward while no taken day
    *  sits inside the range; any other tap restarts at the tapped day. */
@@ -162,7 +169,17 @@ export function ManualBookingModal({
 
   function pickDress(id: string) {
     setDressId(id);
-    // A range picked for one dress means nothing for another — clear it.
+    // Default to the dress's first size so the calendar always has a unit to be
+    // about; a range picked for one garment means nothing for another.
+    setSize(dresses.find((d) => d.id === id)?.sizes[0] ?? "");
+    setSelStart(null);
+    setSelEnd(null);
+  }
+
+  function pickSize(next: string) {
+    setSize(next);
+    // Same reasoning as pickDress: the other size is a different garment with
+    // its own calendar, so the range can't carry over.
     setSelStart(null);
     setSelEnd(null);
   }
@@ -189,6 +206,7 @@ export function ManualBookingModal({
   );
 
   const dressPrice = dresses.find((d) => d.id === dressId)?.price ?? 0;
+  const sizeOptions = dresses.find((d) => d.id === dressId)?.sizes ?? [];
   const addOnTotal = picked.reduce(
     (sum, id) => sum + (accessories.find((a) => a.id === id)?.price ?? 0),
     0,
@@ -203,6 +221,7 @@ export function ManualBookingModal({
 
   const canSave =
     dressId !== "" &&
+    size !== "" &&
     renterName.trim().length > 0 &&
     selStart !== null &&
     pickedUnavailable.length === 0;
@@ -213,6 +232,7 @@ export function ManualBookingModal({
     startTransition(async () => {
       const res = await createManualBooking({
         dressId,
+        size,
         renterName,
         startDate: selStart,
         endDate: selEnd ?? selStart,
@@ -311,6 +331,33 @@ export function ManualBookingModal({
                       {d.name}
                     </option>
                   ))}
+                </select>
+              </div>
+
+              {/* Size — one garment per size, so this picks the unit whose
+                  calendar is shown on the left. */}
+              <div>
+                <FieldLabel required>Size</FieldLabel>
+                <p className="mb-1.5 text-body-sm text-text-secondary">
+                  One garment per size — only this size&apos;s dates are blocked.
+                </p>
+                <select
+                  className={inputClass}
+                  value={size}
+                  disabled={dressId === ""}
+                  onChange={(e) => pickSize(e.target.value)}
+                >
+                  {dressId === "" ? (
+                    <option value="">Choose a dress first…</option>
+                  ) : sizeOptions.length === 0 ? (
+                    <option value="">This dress has no sizes yet</option>
+                  ) : (
+                    sizeOptions.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
 

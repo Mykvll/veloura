@@ -16,10 +16,41 @@ export type BlockedDate = {
   dressName: string;
   /** ISO day, "YYYY-MM-DD". */
   day: string;
+  /** Which SIZE of that dress is out. One garment per size, so a row blocks
+   *  only its own size — the other sizes of the same dress stay bookable. */
+  size: string;
 };
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
+}
+
+/**
+ * Can a 2-day rental of this (dress, size) START on `day`? True when the day
+ * itself and the two that follow — the second wear day and the return/wash day —
+ * are all clear for that garment.
+ *
+ * Exported so the size picker above the calendar and the calendar itself can
+ * never disagree about which sizes are free on a date; it is the same rule
+ * create_rent_hold re-checks server-side.
+ */
+export function sizeIsFreeOn(
+  blocked: BlockedDate[],
+  dressId: string,
+  size: string,
+  day: string,
+): boolean {
+  const out = new Set(
+    blocked
+      .filter((b) => b.dressId === dressId && b.size === size)
+      .map((b) => b.day),
+  );
+  for (let n = 0; n <= 2; n++) {
+    const d = new Date(`${day}T00:00:00`);
+    d.setDate(d.getDate() + n);
+    if (out.has(dayKey(d.getFullYear(), d.getMonth(), d.getDate()))) return false;
+  }
+  return true;
 }
 
 /** Build the "YYYY-MM-DD" key for a (year, 0-indexed month, day). */
@@ -54,6 +85,8 @@ export function AvailabilityCalendar({
   blocked,
   dressId,
   dressName,
+  size,
+  sizes,
   mode,
   selected,
   onSelect,
@@ -61,6 +94,12 @@ export function AvailabilityCalendar({
   blocked: BlockedDate[];
   /** The dress being reserved — used to pick out its own blocked days in RENT mode. */
   dressId: string;
+  /** The SIZE being reserved. RENT availability is per garment, so the calendar
+   *  is about this size only; changing it re-renders against the other unit. */
+  size: string;
+  /** Every size this dress is offered in — FITTING mode needs the full list,
+   *  because a fitting day only closes once ALL of them are out. */
+  sizes: string[];
   /** The name of the dress, used in the legend and detail text. */
   dressName: string;
   mode: "rent" | "fitting";
@@ -88,23 +127,38 @@ export function AvailabilityCalendar({
       return { m: dt.getMonth(), y: dt.getFullYear() };
     });
 
-  // Pre-compute the three lookups we need from the flat blocked list:
-  //  - anyBlocked: days SOME dress is out (drives the red dot + shaded cell)
-  //  - thisBlocked: days THIS dress is out (drives RENT-mode disabling)
-  //  - namesByDay: which dresses are out on a day (for the info panel)
-  const { anyBlocked, thisBlocked, namesByDay } = useMemo(() => {
-    const anyBlocked = new Set<string>();
+  // Pre-compute the lookups we need from the flat blocked list:
+  //  - thisBlocked:  days THIS dress in THIS size is out (RENT-mode disabling)
+  //  - allSizesOut:  days EVERY size of this dress is out (FITTING-mode disabling)
+  //  - namesByDay:   which dresses are out on a day (for the info panel)
+  //
+  // FITTING used to close a day whenever ANY dress was out. A fitting only needs
+  // one garment of this dress in the room, so it now closes only once every size
+  // of it is gone — the same rule create_fitting_booking enforces server-side.
+  const { thisBlocked, allSizesOut, namesByDay } = useMemo(() => {
     const thisBlocked = new Set<string>();
     const namesByDay = new Map<string, string[]>();
+    // day -> the sizes of THIS dress that are out on it
+    const outSizesByDay = new Map<string, Set<string>>();
     for (const b of blocked) {
-      anyBlocked.add(b.day);
-      if (b.dressId === dressId) thisBlocked.add(b.day);
+      if (b.dressId === dressId) {
+        if (b.size === size) thisBlocked.add(b.day);
+        const set = outSizesByDay.get(b.day) ?? new Set<string>();
+        set.add(b.size);
+        outSizesByDay.set(b.day, set);
+      }
       const names = namesByDay.get(b.day) ?? [];
       if (!names.includes(b.dressName)) names.push(b.dressName);
       namesByDay.set(b.day, names);
     }
-    return { anyBlocked, thisBlocked, namesByDay };
-  }, [blocked, dressId]);
+    const allSizesOut = new Set<string>();
+    if (sizes.length > 0) {
+      for (const [day, out] of outSizesByDay) {
+        if (sizes.every((s) => out.has(s))) allSizesOut.add(day);
+      }
+    }
+    return { thisBlocked, allSizesOut, namesByDay };
+  }, [blocked, dressId, size, sizes]);
 
   // Wear days are `selected` and `selected + 1`; `selected + 2` is the return day.
   const secondWearDayKey =
@@ -177,12 +231,13 @@ export function AvailabilityCalendar({
           if (d === null) return <div key={`e${i}`} />;
 
           const key = dayKey(year, month, d);
-          // RENT: only THIS dress's bookings count as taken — other dresses are
-          // ignored (a day Emily is out doesn't touch this dress's calendar).
-          // FITTING: any dress out blocks the day. This drives the red dot, the
-          // shaded cell, AND the disabling below, matching the design prototype.
+          // RENT: only THIS dress in THIS size counts as taken — the other
+          // sizes of the same dress are separate garments, and other dresses are
+          // ignored entirely.
+          // FITTING: the day closes only when EVERY size of this dress is out.
+          // This drives the red dot, the shaded cell, AND the disabling below.
           const rentedOut =
-            mode === "fitting" ? anyBlocked.has(key) : thisBlocked.has(key);
+            mode === "fitting" ? allSizesOut.has(key) : thisBlocked.has(key);
           const isSel = selected === key;
           const isToday = key === todayKey;
           const isPast = key < todayKey;

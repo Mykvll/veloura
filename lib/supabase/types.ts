@@ -105,9 +105,11 @@ export type Database = {
           plate: string | null
           proof_url: string | null
           renter_name: string
+          size: string | null
           start_date: string | null
           type: string
           vehicle: string | null
+          wash_release: string
         }
         Insert: {
           address?: string | null
@@ -130,9 +132,11 @@ export type Database = {
           plate?: string | null
           proof_url?: string | null
           renter_name: string
+          size?: string | null
           start_date?: string | null
           type: string
           vehicle?: string | null
+          wash_release?: string
         }
         Update: {
           address?: string | null
@@ -155,9 +159,11 @@ export type Database = {
           plate?: string | null
           proof_url?: string | null
           renter_name?: string
+          size?: string | null
           start_date?: string | null
           type?: string
           vehicle?: string | null
+          wash_release?: string
         }
         Relationships: [
           {
@@ -406,6 +412,7 @@ export type Database = {
           blocked_day: string | null
           dress_id: string | null
           dress_name: string | null
+          size: string | null
         }
         Relationships: [
           {
@@ -470,6 +477,7 @@ export type Database = {
           p_dress_id: string
           p_id_path: string
           p_name: string
+          p_size: string
         }
         Returns: Json
       }

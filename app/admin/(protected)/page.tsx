@@ -166,7 +166,7 @@ export default async function AdminDashboardPage() {
   const { data: rentalRows } = await supabase
     .from("bookings")
     .select(
-      `id, renter_name, dress_id, dress_name, contact, address, start_date, end_date,
+      `id, renter_name, dress_id, dress_name, size, contact, address, start_date, end_date,
        deliver_time, amount, payment_status, payment_method, manual, proof_url, id_photo_url, created_at`,
     )
     .eq("type", "rent")
@@ -300,6 +300,7 @@ export default async function AdminDashboardPage() {
         renter: b.renter_name,
         dress: b.dress_name ?? "Dress",
         dressId: b.dress_id,
+        size: b.size,
         contact: b.contact,
         address: b.address,
         paymentMethod: b.payment_method,
@@ -504,6 +505,8 @@ export default async function AdminDashboardPage() {
     id: d.id,
     name: d.name,
     price: d.price,
+    // One garment per size: the manual-booking form picks a unit, not a dress.
+    sizes: d.sizes.map((s) => s.size),
   }));
 
   // Stacked sections on one page. The anchor ids (#calendar, #bookings, …) are

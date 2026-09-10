@@ -74,6 +74,9 @@ export type AdminBooking = {
   /** Which dress the booking holds — the manual-booking calendar uses this to
    *  work out the chosen dress's taken days. Null if the dress was deleted. */
   dressId: string | null;
+  /** Which SIZE of that dress. One garment per size, so (dressId, size) is the
+   *  physical unit that is out — the manual-booking calendar keys on both. */
+  size: string | null;
   /** Contact number; manual bookings don't carry one (the DM has it). */
   contact: string | null;
   /** Delivery address the customer typed; null for manual bookings. */

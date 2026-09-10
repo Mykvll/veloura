@@ -19,6 +19,9 @@ type ActionResult = { error: string | null };
  */
 export type ManualBookingInput = {
   dressId: string;
+  /** Which size of the dress. One garment per size, so this names the physical
+   *  unit being reserved — the clash check and the dates are per unit. */
+  size: string;
   renterName: string;
   /** Reserved range, ISO "YYYY-MM-DD" — past or future, admin's call. */
   startDate: string;
@@ -161,7 +164,8 @@ async function currentStatus(
  * Create one manual booking.
  *
  * Server-side clash rule (mirroring the modal's calendar): the range may not
- * overlap another active rental's START..END days for this dress — but wash
+ * overlap another active rental's START..END days for this dress IN THIS SIZE
+ * (each size is its own garment, so the other sizes are unaffected) — but wash
  * days (end + 1) are fine to book over: the admin hand-washes the dresses
  * herself and knows when they'll be ready. That's why this checks bookings
  * directly instead of blocked_dates, which bakes wash days in. Same
@@ -194,6 +198,20 @@ export async function createManualBooking(
     return { error: "Please choose a dress from the catalogue." };
   }
 
+  // The size must be one this dress is actually offered in. Without it the
+  // booking would hold no identifiable garment, and every unlabelled booking
+  // would collide with every other (the constraint keys on coalesce(size,'')).
+  const size = input.size.trim();
+  const { data: sizeRow } = await supabase
+    .from("dress_sizes")
+    .select("size")
+    .eq("dress_id", dress.id)
+    .eq("size", size)
+    .maybeSingle();
+  if (!size || !sizeRow) {
+    return { error: "Please choose a size this dress is offered in." };
+  }
+
   // Find ACTIVE bookings for this dress that would clash. "Active" now includes
   // live customer holds — the `bookings_no_overlap` exclusion constraint counts
   // them, so a manual booking over a hold must be resolved, not silently fail.
@@ -204,8 +222,9 @@ export async function createManualBooking(
   const candEnd = addDays(input.endDate, 1); // exclusive upper of the manual range
   const { data: activeRows, error: activeErr } = await supabase
     .from("bookings")
-    .select("id, start_date, end_date, payment_status, renter_name, manual")
+    .select("id, start_date, end_date, payment_status, renter_name, manual, wash_release")
     .eq("dress_id", input.dressId)
+    .eq("size", size)
     .eq("type", "rent")
     .in("payment_status", ["hold", "pending", "verified"]);
   if (activeErr) {
@@ -214,7 +233,11 @@ export async function createManualBooking(
 
   const clashes = (activeRows ?? []).filter((b) => {
     if (!b.start_date || !b.end_date) return false;
-    const bEnd = addDays(b.end_date, b.manual ? 1 : 2); // exclusive upper
+    // A manual booking reserves only its rental days; so does a customer one
+    // whose wash day the admin has already released. Everything else runs
+    // through end + 1. Mirrors bookings_no_overlap exactly.
+    const reservesWashDay = !b.manual && b.wash_release === "none";
+    const bEnd = addDays(b.end_date, reservesWashDay ? 2 : 1); // exclusive upper
     return input.startDate < bEnd && b.start_date < candEnd;
   });
 
@@ -289,6 +312,7 @@ export async function createManualBooking(
       renter_name: renterName,
       dress_id: dress.id,
       dress_name: dress.name, // snapshot
+      size,
       start_date: input.startDate,
       end_date: input.endDate,
       amount: dress.price + addOnTotal,

@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 
 /** One available size with its measurements (from the dress_sizes table). */
 export type DressSize = {
@@ -37,25 +36,33 @@ function SpecRow({ label, cm }: { label: string; cm: number | null }) {
  * Right column of the dress-detail page: pick a size, read that size's
  * measurements, see the fees, and reserve.
  *
- * Choosing a size swaps the measurements shown, so this holds client state.
+ * SIZE IS NO LONGER JUST A MEASUREMENT SWITCH. Each size is its own garment, so
+ * the size chosen here decides which unit gets reserved and which calendar the
+ * next step shows. The choice is therefore lifted to the parent (the modal),
+ * which carries it into the date step — this panel only renders it.
+ *
  * Accessories are NOT chosen here — they live in the rent form (step 2), so
  * this column is just sizes, fees, and the two actions.
  */
 export function DressDetailsPanel({
   sizes,
   price,
+  size,
+  onSizeChange,
   onReserve,
   onFitting,
 }: {
   sizes: DressSize[];
   price: number;
+  /** The chosen size label, owned by the parent. */
+  size: string;
+  onSizeChange: (size: string) => void;
   /** Open the date calendar to rent this dress. */
   onReserve: () => void;
   /** Open the date calendar to book a fitting. */
   onFitting: () => void;
 }) {
-  const [activeSize, setActiveSize] = useState(0);
-  const selected = sizes[activeSize];
+  const selected = sizes.find((s) => s.size === size) ?? sizes[0];
 
   return (
     <div className="flex flex-col gap-6">
@@ -67,13 +74,13 @@ export function DressDetailsPanel({
               Available sizes
             </div>
             <div className="flex flex-wrap gap-2">
-              {sizes.map((s, i) => {
-                const isActive = i === activeSize;
+              {sizes.map((s) => {
+                const isActive = s.size === selected.size;
                 return (
                   <button
                     key={s.size}
                     type="button"
-                    onClick={() => setActiveSize(i)}
+                    onClick={() => onSizeChange(s.size)}
                     aria-pressed={isActive}
                     className={`min-h-tap min-w-tap rounded-pill border px-4 text-label-sm uppercase tracking-wide transition-fast ${
                       isActive

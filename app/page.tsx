@@ -139,7 +139,7 @@ export default async function Home() {
   // <AvailabilityCalendar>.
   const { data: blockedRows } = await supabase
     .from("blocked_dates")
-    .select("dress_id, dress_name, blocked_day");
+    .select("dress_id, dress_name, blocked_day, size");
 
   const blockedDates: BlockedDate[] = (blockedRows ?? [])
     // The view's columns are nullable in the generated types; keep only complete
@@ -149,6 +149,9 @@ export default async function Home() {
       dressId: r.dress_id as string,
       dressName: r.dress_name ?? "",
       day: r.blocked_day as string,
+      // Which garment is out. One unit per size, so a row only blocks its own
+      // size — see the "size" column added by supabase/per-size-availability.sql.
+      size: r.size ?? "",
     }));
 
   // Already-taken fitting slots, so the fitting form can disable them. Read from
