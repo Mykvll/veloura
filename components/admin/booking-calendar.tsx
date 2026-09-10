@@ -10,7 +10,7 @@ import {
   Gem,
 } from "lucide-react";
 import { SectionTitle } from "@/components/section-title";
-import type { CalendarRental, CalendarFitting } from "./types";
+import { unitLabel, type CalendarRental, type CalendarFitting } from "./types";
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
@@ -312,7 +312,7 @@ export function BookingCalendar({
                       {a?.rents.map((r) => (
                         <span key={`r${r.id}`} className="block leading-[1.25]">
                           <span className="block text-[11px] font-semibold text-state-error">
-                            {r.dress}
+                            {unitLabel(r)}
                           </span>
                           {r.accessories.length ? (
                             <span className="block text-[10px] text-text-secondary">
@@ -334,7 +334,7 @@ export function BookingCalendar({
                           key={`w${r.id}`}
                           className="block text-[10px] leading-[1.25] text-brand-secondary"
                         >
-                          Wash · {r.dress}
+                          Wash · {unitLabel(r)}
                         </span>
                       ))}
                     </span>
@@ -424,7 +424,7 @@ export function BookingCalendar({
                       </span>
                       <div>
                         <b className="text-text-primary">
-                          {r.dress} · rented out
+                          {unitLabel(r)} · rented out
                           {isPickup && r.deliver
                             ? ` · deliver ${r.deliver}`
                             : ""}
@@ -467,7 +467,7 @@ export function BookingCalendar({
                     </span>
                     <div>
                       <b className="text-text-primary">
-                        {r.dress} · hand-wash in progress
+                        {unitLabel(r)} · hand-wash in progress
                       </b>
                       <div className="text-text-secondary">
                         Returned this day by {r.renter} — unavailable to rent

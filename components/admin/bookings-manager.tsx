@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { niceDate } from "@/lib/reserve";
+import { unitLabel } from "./types";
 import {
   verifyBooking,
   flagBookingInvalid,
@@ -148,7 +149,7 @@ function BookingDetailsModal({
         {/* All the fields, scrollable when tall. */}
         <div className="overflow-y-auto px-6 py-4">
           <DetailRow label="Renter" value={b.renter} />
-          <DetailRow label="Dress" value={b.dress} />
+          <DetailRow label="Dress" value={unitLabel(b)} />
           <DetailRow
             label="Status"
             value={
@@ -519,7 +520,7 @@ export function BookingsManager({
                 {/* Renter / dress / dates / status */}
                 <div className="min-w-0 flex-1 basis-56">
                   <div className="text-label-base uppercase tracking-wide text-text-heading">
-                    {b.renter} · {b.dress}
+                    {b.renter} · {unitLabel(b)}
                   </div>
                   <div className="mt-0.5 text-body-sm text-text-secondary">
                     {b.start ? niceDate(b.start) : "—"}

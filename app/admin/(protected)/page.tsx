@@ -381,6 +381,7 @@ export default async function AdminDashboardPage() {
     .map((b) => ({
       id: b.id,
       dress: b.dress,
+      size: b.size,
       renter: b.renter,
       start: b.start as string,
       end: b.end as string,
@@ -397,6 +398,8 @@ export default async function AdminDashboardPage() {
     .map((h) => ({
       id: h.id,
       dress: h.dress_name ?? "Dress",
+      // rental_history predates per-size inventory and records no size.
+      size: null,
       renter: h.renter_name,
       start: h.start_date,
       end: h.end_date,
@@ -476,6 +479,7 @@ export default async function AdminDashboardPage() {
     id: b.id,
     renter: b.renter,
     dress: b.dress,
+    size: b.size,
     start: b.start as string,
     end: b.end as string,
     amount: b.amount,

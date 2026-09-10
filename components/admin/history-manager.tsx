@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { PenLine, BadgeCheck, Search, X } from "lucide-react";
 import { niceDate } from "@/lib/reserve";
+import { unitLabel } from "./types";
 import { removePastRental, fetchHistoryPage } from "@/app/admin/(protected)/history-actions";
 import { SectionTitle } from "@/components/section-title";
 import { LogRentalModal, type LogRentalDressOption } from "./log-rental-modal";
@@ -96,7 +97,7 @@ function HistoryEntryRow({
       {/* Renter / dress / dates / amount */}
       <div className="min-w-0 flex-1 basis-56">
         <div className="text-label-base uppercase tracking-wide text-text-heading">
-          {entry.renter} · {entry.dress}
+          {entry.renter} · {unitLabel(entry)}
         </div>
         <div className="mt-0.5 text-body-sm text-text-secondary">
           {niceDate(entry.start)} – {niceDate(entry.end)} · paid{" "}
