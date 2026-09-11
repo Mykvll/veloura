@@ -92,6 +92,10 @@ export type AdminBooking = {
   status: string;
   /** Admin-entered (FB/IG/TikTok/walk-in) — no proof; payment set directly. */
   manual: boolean;
+  /** Whether the hand-wash day (end + 1) has been released, and to whom:
+   *  'none' reserved for washing · 'admin' bookable by the owner only ·
+   *  'public' live on the customer site too. */
+  washRelease: "none" | "admin" | "public";
   /** When the booking was made (ISO timestamp) — shown as "Booked …". */
   bookedAt: string | null;
   /** Signed URL of the payment screenshot, or null if none was uploaded. */

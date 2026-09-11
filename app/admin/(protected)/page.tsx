@@ -167,7 +167,8 @@ export default async function AdminDashboardPage() {
     .from("bookings")
     .select(
       `id, renter_name, dress_id, dress_name, size, contact, address, start_date, end_date,
-       deliver_time, amount, payment_status, payment_method, manual, proof_url, id_photo_url, created_at`,
+       deliver_time, amount, payment_status, payment_method, manual, wash_release,
+       proof_url, id_photo_url, created_at`,
     )
     .eq("type", "rent")
     // Live customer holds are transient (a 10-min payment window) — they aren't
@@ -310,6 +311,7 @@ export default async function AdminDashboardPage() {
         amount: b.amount ?? 0,
         status: b.payment_status,
         manual: b.manual,
+        washRelease: (b.wash_release ?? "none") as "none" | "admin" | "public",
         bookedAt: b.created_at,
         proofUrl,
         idPhotoUrl,

@@ -12,13 +12,15 @@ import {
   Ruler,
   X,
 } from "lucide-react";
-import { niceDate } from "@/lib/reserve";
+import { niceDate, addDays } from "@/lib/reserve";
 import { unitLabel } from "./types";
+
 import {
   verifyBooking,
   flagBookingInvalid,
   deleteBooking,
   markBookingRefunded,
+  setWashRelease,
 } from "@/app/admin/(protected)/booking-actions";
 import { cancelFitting } from "@/app/admin/(protected)/fitting-actions";
 import { SectionTitle } from "@/components/section-title";
@@ -29,6 +31,41 @@ import {
 } from "./manual-booking-modal";
 import { FittingEditorModal } from "./fitting-editor-modal";
 import type { AdminBooking, AdminFitting } from "./types";
+
+/** "Jul 31" — the compact form the wash-day strip uses. */
+function shortDay(iso: string): string {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+/** The hand-wash day a rental reserves: the day after it ends. */
+function washDayOf(b: AdminBooking): string | null {
+  return b.end ? addDays(b.end, 1) : null;
+}
+
+/**
+ * Has someone already booked this rental's freed wash day? Only matters when
+ * re-blocking: the exclusion constraint stops NEW bookings but can't retract
+ * one already made, so the UI has to say so before the owner assumes otherwise.
+ * Same garment only — another size is a different dress on the rack.
+ */
+function washDayTaken(b: AdminBooking, all: AdminBooking[]): boolean {
+  const day = washDayOf(b);
+  if (!day) return false;
+  return all.some(
+    (o) =>
+      o.id !== b.id &&
+      o.dressId === b.dressId &&
+      o.size === b.size &&
+      (o.status === "pending" || o.status === "verified") &&
+      !!o.start &&
+      !!o.end &&
+      o.start <= day &&
+      day <= o.end,
+  );
+}
 
 /**
  * Status → label + colour + icon. Gold for "awaiting", olive for verified,
@@ -280,18 +317,22 @@ export function BookingsManager({
   const [fitBusy, setFitBusy] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [confirmRefundId, setConfirmRefundId] = useState<string | null>(null);
+  // Which card has the wash-day strip expanded, and which is confirming a
+  // re-block over a day that has since been booked.
+  const [washOpenId, setWashOpenId] = useState<string | null>(null);
+  const [confirmReblockId, setConfirmReblockId] = useState<string | null>(null);
   // Which card+button has an action in flight — the kind lets each button show
   // its own "…ing" label instead of all of them changing at once.
   const [busy, setBusy] = useState<{
     id: string;
-    kind: "verify" | "invalid" | "delete" | "refund";
+    kind: "verify" | "invalid" | "delete" | "refund" | "wash";
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   function run(
     id: string,
-    kind: "verify" | "invalid" | "delete" | "refund",
+    kind: "verify" | "invalid" | "delete" | "refund" | "wash",
     action: (id: string) => Promise<{ error: string | null }>,
   ) {
     setError(null);
@@ -304,6 +345,8 @@ export function BookingsManager({
         return;
       }
       setConfirmId(null);
+      setWashOpenId(null);
+      setConfirmReblockId(null);
       setConfirmRefundId(null);
       router.refresh();
     });
@@ -675,6 +718,194 @@ export function BookingsManager({
                     </button>
                   )}
                 </div>
+
+                {/* WASH-DAY RELEASE.
+                    Deliberately NOT a sibling pill of Verify / Mark refunded /
+                    Delete: those change the booking, this frees a single date
+                    and leaves the renter's booking exactly as it was. Hence the
+                    rule above it — "and separately, about the wash day". */}
+                {b.end && b.status !== "invalid" && b.status !== "refunded" ? (
+                  <div
+                    className="basis-full border-t border-border-soft pt-3"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {(() => {
+                      const day = washDayOf(b) as string;
+                      const freed = b.washRelease !== "none";
+                      const pill =
+                        "inline-flex min-h-tap items-center justify-center rounded-pill px-3.5 text-label-sm uppercase tracking-wide transition-colors disabled:opacity-60";
+                      const outline = `${pill} border border-border-soft bg-white text-text-primary hover:bg-background-panel`;
+                      const gold = `${pill} bg-brand-primary text-text-on-primary hover:bg-brand-primary-hover`;
+                      const busyWash = busy?.id === b.id && busy.kind === "wash";
+
+                      // Expanded: both release choices, one tap each.
+                      if (washOpenId === b.id && !freed) {
+                        return (
+                          <div className="flex flex-col gap-2.5">
+                            <p className="text-body-sm text-text-primary">
+                              Washing done? <b>{shortDay(day)}</b> opens up for{" "}
+                              {unitLabel(b)}. {b.renter}&apos;s rental is
+                              untouched — they still have{" "}
+                              {b.start ? niceDate(b.start) : "—"}
+                              {b.end ? ` – ${niceDate(b.end)}` : ""}.
+                            </p>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <button
+                                type="button"
+                                disabled={busyWash}
+                                onClick={() =>
+                                  run(b.id, "wash", (id) =>
+                                    setWashRelease(id, "admin"),
+                                  )
+                                }
+                                className={outline}
+                              >
+                                Free for me only
+                              </button>
+                              <button
+                                type="button"
+                                disabled={busyWash}
+                                onClick={() =>
+                                  run(b.id, "wash", (id) =>
+                                    setWashRelease(id, "public"),
+                                  )
+                                }
+                                className={gold}
+                              >
+                                {busyWash ? "Freeing…" : "Free on the website"}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={busyWash}
+                                onClick={() => setWashOpenId(null)}
+                                className={outline}
+                              >
+                                Keep it blocked
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // Re-blocking a day someone has since booked.
+                      if (confirmReblockId === b.id) {
+                        return (
+                          <div className="flex flex-col gap-2.5">
+                            <p className="text-body-sm text-text-primary">
+                              {shortDay(day)} has already been booked since you
+                              freed it. Re-blocking won&apos;t cancel that
+                              booking — it only stops new ones.
+                            </p>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <button
+                                type="button"
+                                disabled={busyWash}
+                                onClick={() =>
+                                  run(b.id, "wash", (id) =>
+                                    setWashRelease(id, "none"),
+                                  )
+                                }
+                                className={gold}
+                              >
+                                {busyWash ? "Blocking…" : "Re-block anyway"}
+                              </button>
+                              <button
+                                type="button"
+                                disabled={busyWash}
+                                onClick={() => setConfirmReblockId(null)}
+                                className={outline}
+                              >
+                                Leave it free
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // Collapsed — one status line plus its actions.
+                      return (
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                          <span className="inline-flex items-center gap-2 text-label-sm uppercase tracking-wide text-text-secondary">
+                            <span
+                              className={`h-2 w-2 flex-none rounded-pill ${
+                                freed ? "bg-border-accent" : "bg-border-strong"
+                              }`}
+                            />
+                            {freed ? (
+                              <>
+                                Wash day <b>{shortDay(day)}</b> freed ·{" "}
+                                {b.washRelease === "public"
+                                  ? "on the website"
+                                  : "you only"}
+                              </>
+                            ) : (
+                              <>
+                                Hand-wash day <b>{shortDay(day)}</b> — blocked
+                                for everyone
+                              </>
+                            )}
+                          </span>
+                          <span className="flex flex-wrap items-center gap-2">
+                            {!freed ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setError(null);
+                                  setWashOpenId(b.id);
+                                }}
+                                className={outline}
+                              >
+                                Free the wash day
+                              </button>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  disabled={busyWash}
+                                  onClick={() =>
+                                    run(b.id, "wash", (id) =>
+                                      setWashRelease(
+                                        id,
+                                        b.washRelease === "public"
+                                          ? "admin"
+                                          : "public",
+                                      ),
+                                    )
+                                  }
+                                  className={outline}
+                                >
+                                  {b.washRelease === "public"
+                                    ? "Limit to me only"
+                                    : "Also free on the website"}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={busyWash}
+                                  onClick={() => {
+                                    setError(null);
+                                    // Undo must cost what the release cost —
+                                    // only confirm when a real booking is at
+                                    // stake on the freed day.
+                                    if (washDayTaken(b, bookings)) {
+                                      setConfirmReblockId(b.id);
+                                    } else {
+                                      run(b.id, "wash", (id) =>
+                                        setWashRelease(id, "none"),
+                                      );
+                                    }
+                                  }}
+                                  className={outline}
+                                >
+                                  {busyWash ? "Blocking…" : "Block it again"}
+                                </button>
+                              </>
+                            )}
+                          </span>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                ) : null}
               </div>
             );
           })
