@@ -74,6 +74,9 @@ export type AdminBooking = {
   /** Which dress the booking holds — the manual-booking calendar uses this to
    *  work out the chosen dress's taken days. Null if the dress was deleted. */
   dressId: string | null;
+  /** Which SIZE of that dress. One garment per size, so (dressId, size) is the
+   *  physical unit that is out — the manual-booking calendar keys on both. */
+  size: string | null;
   /** Contact number; manual bookings don't carry one (the DM has it). */
   contact: string | null;
   /** Delivery address the customer typed; null for manual bookings. */
@@ -89,6 +92,10 @@ export type AdminBooking = {
   status: string;
   /** Admin-entered (FB/IG/TikTok/walk-in) — no proof; payment set directly. */
   manual: boolean;
+  /** Whether the hand-wash day (end + 1) has been released, and to whom:
+   *  'none' reserved for washing · 'admin' bookable by the owner only ·
+   *  'public' live on the customer site too. */
+  washRelease: "none" | "admin" | "public";
   /** When the booking was made (ISO timestamp) — shown as "Booked …". */
   bookedAt: string | null;
   /** Signed URL of the payment screenshot, or null if none was uploaded. */
@@ -111,6 +118,8 @@ export type AdminPastRental = {
   id: string;
   renter: string;
   dress: string;
+  /** Which size — null for rentals logged before the app recorded one. */
+  size?: string | null;
   /** Rental dates, ISO "YYYY-MM-DD". */
   start: string;
   end: string;
@@ -180,6 +189,8 @@ export type AnalyticsData = {
 export type CalendarRental = {
   id: string;
   dress: string;
+  /** Which size — one garment per size. Null for logged pre-system rentals. */
+  size: string | null;
   renter: string;
   start: string;
   end: string;
@@ -242,3 +253,17 @@ export const SIZE_OPTIONS = ["XS", "S", "M", "L", "XL", "XXL"] as const;
 
 /** The labels a product photo can carry. */
 export const PHOTO_LABELS = ["Front", "Back", "Detail", "Worn"] as const;
+
+/**
+ * How a booking names the garment it holds: "Emily · M". One dress can be
+ * stocked in several sizes, each its own physical unit, so two same-day
+ * bookings of the same dress are normal — without the size they read as a
+ * double-booking bug.
+ *
+ * Falls back to the dress name alone when there is no size: fittings are of the
+ * listing rather than a unit, and pre-system rentals logged in rental_history
+ * never recorded one.
+ */
+export function unitLabel(x: { dress: string; size?: string | null }): string {
+  return x.size ? `${x.dress} \u00b7 ${x.size}` : x.dress;
+}

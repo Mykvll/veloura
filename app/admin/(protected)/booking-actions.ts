@@ -19,6 +19,9 @@ type ActionResult = { error: string | null };
  */
 export type ManualBookingInput = {
   dressId: string;
+  /** Which size of the dress. One garment per size, so this names the physical
+   *  unit being reserved — the clash check and the dates are per unit. */
+  size: string;
   renterName: string;
   /** Reserved range, ISO "YYYY-MM-DD" — past or future, admin's call. */
   startDate: string;
@@ -161,7 +164,8 @@ async function currentStatus(
  * Create one manual booking.
  *
  * Server-side clash rule (mirroring the modal's calendar): the range may not
- * overlap another active rental's START..END days for this dress — but wash
+ * overlap another active rental's START..END days for this dress IN THIS SIZE
+ * (each size is its own garment, so the other sizes are unaffected) — but wash
  * days (end + 1) are fine to book over: the admin hand-washes the dresses
  * herself and knows when they'll be ready. That's why this checks bookings
  * directly instead of blocked_dates, which bakes wash days in. Same
@@ -194,6 +198,20 @@ export async function createManualBooking(
     return { error: "Please choose a dress from the catalogue." };
   }
 
+  // The size must be one this dress is actually offered in. Without it the
+  // booking would hold no identifiable garment, and every unlabelled booking
+  // would collide with every other (the constraint keys on coalesce(size,'')).
+  const size = input.size.trim();
+  const { data: sizeRow } = await supabase
+    .from("dress_sizes")
+    .select("size")
+    .eq("dress_id", dress.id)
+    .eq("size", size)
+    .maybeSingle();
+  if (!size || !sizeRow) {
+    return { error: "Please choose a size this dress is offered in." };
+  }
+
   // Find ACTIVE bookings for this dress that would clash. "Active" now includes
   // live customer holds — the `bookings_no_overlap` exclusion constraint counts
   // them, so a manual booking over a hold must be resolved, not silently fail.
@@ -204,8 +222,9 @@ export async function createManualBooking(
   const candEnd = addDays(input.endDate, 1); // exclusive upper of the manual range
   const { data: activeRows, error: activeErr } = await supabase
     .from("bookings")
-    .select("id, start_date, end_date, payment_status, renter_name, manual")
+    .select("id, start_date, end_date, payment_status, renter_name, manual, wash_release")
     .eq("dress_id", input.dressId)
+    .eq("size", size)
     .eq("type", "rent")
     .in("payment_status", ["hold", "pending", "verified"]);
   if (activeErr) {
@@ -214,7 +233,11 @@ export async function createManualBooking(
 
   const clashes = (activeRows ?? []).filter((b) => {
     if (!b.start_date || !b.end_date) return false;
-    const bEnd = addDays(b.end_date, b.manual ? 1 : 2); // exclusive upper
+    // A manual booking reserves only its rental days; so does a customer one
+    // whose wash day the admin has already released. Everything else runs
+    // through end + 1. Mirrors bookings_no_overlap exactly.
+    const reservesWashDay = !b.manual && b.wash_release === "none";
+    const bEnd = addDays(b.end_date, reservesWashDay ? 2 : 1); // exclusive upper
     return input.startDate < bEnd && b.start_date < candEnd;
   });
 
@@ -289,6 +312,7 @@ export async function createManualBooking(
       renter_name: renterName,
       dress_id: dress.id,
       dress_name: dress.name, // snapshot
+      size,
       start_date: input.startDate,
       end_date: input.endDate,
       amount: dress.price + addOnTotal,
@@ -367,6 +391,56 @@ export async function markBookingRefunded(id: string): Promise<ActionResult> {
  * here: they were already reserved at hold time (create_rent_hold → rented+1)
  * and pending→verified both count as active, so nothing to adjust.
  */
+/**
+ * Release (or re-block) a rental's hand-wash day — the day after it ends.
+ *
+ * A rental reserves its rental days PLUS end_date + 1 for hand-washing. Often
+ * the washing is done early, so the owner wants that day back. She decides two
+ * things at once:
+ *
+ *   'none'    reserved for washing — nobody books it (the default)
+ *   'admin'   washing done; SHE can book it, the customer site still hides it
+ *   'public'  washing done; the day goes live on the website too
+ *
+ * This changes ONE DATE and nothing else. The renter keeps their booking, their
+ * dates, their payment status and their proof — this is deliberately not a
+ * sibling of Mark refunded / Delete, which do change the booking.
+ *
+ * The column is honoured by bookings_no_overlap (what may be booked over) and
+ * by the blocked_dates view (what the public sees), so flipping it is the whole
+ * implementation — see supabase/per-size-availability.sql §2-4.
+ */
+export async function setWashRelease(
+  id: string,
+  release: "none" | "admin" | "public",
+): Promise<ActionResult> {
+  const supabase = await createClient();
+  const denied = await requireAdmin(supabase);
+  if (denied) return denied;
+
+  // Narrow the client-sent string before it reaches the DB's check constraint,
+  // so a bad value is a clear message rather than a raw Postgres error.
+  if (!["none", "admin", "public"].includes(release)) {
+    return { error: "That isn't a valid wash-day setting." };
+  }
+
+  const status = await currentStatus(supabase, id);
+  if (status === null) return { error: "That booking no longer exists." };
+
+  const { error } = await supabase
+    .from("bookings")
+    .update({ wash_release: release })
+    .eq("id", id);
+  if (error) return { error: error.message };
+
+  // Re-blocking can't retract a booking someone already made on the freed day —
+  // the exclusion constraint simply stops NEW ones. The UI warns about that
+  // before calling this; nothing to undo here.
+  revalidatePath("/admin");
+  revalidatePath("/");
+  return { error: null };
+}
+
 export async function verifyBooking(id: string): Promise<ActionResult> {
   const supabase = await createClient();
   const denied = await requireAdmin(supabase);

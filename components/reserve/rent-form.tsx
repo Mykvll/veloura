@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { AccessoryPicker, type CustomerAccessory } from "../accessory-picker";
 import { accStateForBooking } from "@/lib/accessories";
@@ -54,6 +54,44 @@ const inputClass =
   "min-h-tap w-full rounded-sm border border-border-soft bg-white px-4 py-2 text-body-base text-text-primary outline-none placeholder:text-text-secondary focus:border-border-accent focus:shadow-focus";
 
 /**
+ * Re-read the `accessory_blocked_dates` view from the browser, shaped like the
+ * `blockedDays` the page handed us at render. Returns null on any failure, so
+ * the caller can simply keep the page-load snapshot rather than wrongly showing
+ * everything as free.
+ */
+async function fetchBlockedDays(
+  supabase: ReturnType<typeof createClient>,
+): Promise<Record<string, string[]> | null> {
+  const { data, error } = await supabase
+    .from("accessory_blocked_dates")
+    .select("accessory_id, blocked_day");
+  if (error || !data) return null;
+  const map: Record<string, string[]> = {};
+  for (const r of data) {
+    // The view's columns are nullable in the generated types; skip partial rows.
+    if (!r.accessory_id || !r.blocked_day) continue;
+    (map[r.accessory_id] ??= []).push(r.blocked_day);
+  }
+  return map;
+}
+
+/**
+ * The warning for add-ons the customer ticked that their chosen date can no
+ * longer take. Names them so the disabled Continue button is never a mystery,
+ * and closes with real advice: an unpaid reservation lapses in about ten
+ * minutes, which frees the unit again.
+ */
+function unavailableMessage(names: string[]): string {
+  const one = names.length === 1;
+  return (
+    `${names.join(", ")} ${one ? "isn't" : "aren't"} available on your chosen ` +
+    `date — tap to remove ${one ? "it" : "them"} to continue, or try again in ` +
+    `about 10 minutes: a reservation that isn't paid for lapses and frees ` +
+    `${one ? "the add-on" : "the add-ons"} again.`
+  );
+}
+
+/**
  * The rent form — step 2 of the reserve flow, shown beside the calendar.
  * Collects the renter's details, their valid ID, the chosen accessories and a
  * delivery time, then hands off to the payment step (the booking is only saved
@@ -67,11 +105,14 @@ const inputClass =
  */
 export function RentForm({
   dress,
+  size,
   accessories,
   date,
   onContinue,
 }: {
   dress: { id: string; name: string; price: number };
+  /** The size being reserved — one garment per size, so this picks the unit. */
+  size: string;
   accessories: CustomerAccessory[];
   /** The rental date picked on the calendar, or null until one is chosen. */
   date: string | null;
@@ -86,6 +127,20 @@ export function RentForm({
   const [deliverTime, setDeliverTime] = useState("");
   const [picked, setPicked] = useState<string[]>([]);
 
+  // WHY WE RE-READ AVAILABILITY IN THE BROWSER
+  // ------------------------------------------
+  // `accessories` carries the blocked days as they were when the PAGE was
+  // rendered. A tab left open while another customer reserves the last unit
+  // misses that reservation, so the picker keeps offering an add-on the server
+  // is about to refuse (create_rent_hold → conflict 'accessory') and the
+  // customer only finds out at checkout. We re-read `accessory_blocked_dates`
+  // when the date changes and again just before the hold, and judge against
+  // THAT. The RPC stays the authority — this only moves the bad news out of
+  // checkout and into the picker, where the customer can act on it.
+  const [liveBlocked, setLiveBlocked] = useState<Record<string, string[]> | null>(
+    null,
+  );
+
   // Uploaded-ID state: the storage path we send to the server + its filename
   // for display, plus an in-flight flag.
   const [idPath, setIdPath] = useState<string | null>(null);
@@ -96,10 +151,32 @@ export function RentForm({
   // In-flight while create_rent_hold runs (holds the date + starts the timer).
   const [reserving, setReserving] = useState(false);
 
+  // A date is what makes availability meaningful, so refresh on every pick.
+  useEffect(() => {
+    if (!date) return;
+    let cancelled = false;
+    fetchBlockedDays(supabase).then((map) => {
+      if (!cancelled && map) setLiveBlocked(map);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // `supabase` is a stable per-browser instance (see lib/supabase/client.ts).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date]);
+
+  // The accessories as the picker should see them RIGHT NOW: the page-load rows
+  // with their blocked days swapped for the freshest ones we hold. Everything
+  // below (the picker, the running total, unavailablePicked) reads this, so the
+  // whole form agrees on one view of availability.
+  const liveAccessories = liveBlocked
+    ? accessories.map((a) => ({ ...a, blockedDays: liveBlocked[a.id] ?? [] }))
+    : accessories;
+
   const toggle = (id: string) =>
     setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
 
-  const accessoriesTotal = accessories
+  const accessoriesTotal = liveAccessories
     .filter((a) => picked.includes(a.id))
     .reduce((sum, a) => sum + a.price, 0);
   const total = dress.price + accessoriesTotal;
@@ -108,7 +185,7 @@ export function RentForm({
   // unavailable (e.g. picked first, then a clashing date). The server rejects
   // these anyway (create_rent_hold → conflict 'accessory'), so we catch it here
   // and say which one, instead of letting the customer hit that at checkout.
-  const unavailablePicked = accessories.filter(
+  const unavailablePicked = liveAccessories.filter(
     (a) =>
       picked.includes(a.id) &&
       accStateForBooking(a, a.blockedDays, date).code !== "available",
@@ -155,10 +232,32 @@ export function RentForm({
     if (!date || !idPath || reserving) return;
     setError(null);
     setReserving(true);
+
+    // One last look before we take the date: another customer may have claimed
+    // an add-on since this date was picked. Stopping here avoids creating a hold
+    // we already know the RPC will refuse. We deliberately DON'T set an error —
+    // storing the fresh days re-renders the picker, which names the add-on in
+    // the warning line below and disables Continue on its own. A second red
+    // paragraph saying the same thing is just noise.
+    const fresh = await fetchBlockedDays(supabase);
+    if (fresh) {
+      setLiveBlocked(fresh);
+      const taken = accessories.some(
+        (a) =>
+          picked.includes(a.id) &&
+          accStateForBooking(a, fresh[a.id] ?? [], date).code !== "available",
+      );
+      if (taken) {
+        setReserving(false);
+        return;
+      }
+    }
+
     const bookingId = crypto.randomUUID();
     const res = await createRentHold({
       bookingId,
       dressId: dress.id,
+      size,
       name,
       contact,
       address,
@@ -169,6 +268,13 @@ export function RentForm({
     });
     setReserving(false);
     if (res.error || !res.bookingId || !res.holdExpiresAt || !res.serverNow) {
+      // Lost the race in the moment between our re-check and the insert. Re-read
+      // so the warning line can name the add-on that went, instead of leaving
+      // the customer to hunt through the list for it.
+      if (res.conflict === "accessory") {
+        const after = await fetchBlockedDays(supabase);
+        if (after) setLiveBlocked(after);
+      }
       setError(res.error ?? "Something went wrong. Please try again.");
       return;
     }
@@ -259,7 +365,7 @@ export function RentForm({
             Accessories
           </FieldLabel>
           <AccessoryPicker
-            accessories={accessories}
+            accessories={liveAccessories}
             picked={picked}
             onToggle={toggle}
             startDate={date}
@@ -267,11 +373,11 @@ export function RentForm({
           {/* Names the add-on that clashes with the chosen date, so the disabled
               Continue button is never a mystery. Tapping the row removes it. */}
           {unavailablePicked.length > 0 ? (
+            // Built as one string rather than interleaved JSX: the sentence has
+            // several singular/plural swaps, and JSX's whitespace rules around
+            // adjacent {expressions} make it far too easy to lose a space.
             <p className="mt-1.5 text-body-sm text-state-error">
-              {unavailablePicked.map((a) => a.name).join(", ")}{" "}
-              {unavailablePicked.length === 1 ? "isn't" : "aren't"} available on
-              your chosen date — tap to remove{" "}
-              {unavailablePicked.length === 1 ? "it" : "them"} to continue.
+              {unavailableMessage(unavailablePicked.map((a) => a.name))}
             </p>
           ) : null}
         </div>

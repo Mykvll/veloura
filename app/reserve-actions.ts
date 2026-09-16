@@ -148,6 +148,9 @@ export type RentHoldInput = {
   /** Browser-generated UUID — makes create_rent_hold idempotent on retry. */
   bookingId: string;
   dressId: string;
+  /** Which size of the dress — one garment per size, so this names the unit
+   *  being held. The RPC re-checks it against dress_sizes. */
+  size: string;
   name: string;
   contact: string;
   address: string;
@@ -203,6 +206,7 @@ export async function createRentHold(
   const { data, error } = await supabase.rpc("create_rent_hold", {
     p_booking_id: input.bookingId,
     p_dress_id: input.dressId,
+    p_size: input.size,
     p_name: name,
     p_contact: contact,
     p_address: address,
@@ -251,6 +255,11 @@ export async function createRentHold(
         error: "That reservation is no longer active. Please start again.",
         conflict: "gone",
       };
+    }
+    if (res.error === "bad_size") {
+      // The size isn't one this dress is offered in — a stale tab after the
+      // admin edited the catalogue, or a hand-rolled call.
+      return { error: "That size is no longer available. Please pick another." };
     }
     // Field/validation problems (the UI enforces these too).
     return { error: "Please check your details and try again." };

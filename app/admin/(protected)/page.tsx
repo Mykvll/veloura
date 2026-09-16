@@ -166,8 +166,9 @@ export default async function AdminDashboardPage() {
   const { data: rentalRows } = await supabase
     .from("bookings")
     .select(
-      `id, renter_name, dress_id, dress_name, contact, address, start_date, end_date,
-       deliver_time, amount, payment_status, payment_method, manual, proof_url, id_photo_url, created_at`,
+      `id, renter_name, dress_id, dress_name, size, contact, address, start_date, end_date,
+       deliver_time, amount, payment_status, payment_method, manual, wash_release,
+       proof_url, id_photo_url, created_at`,
     )
     .eq("type", "rent")
     // Live customer holds are transient (a 10-min payment window) — they aren't
@@ -300,6 +301,7 @@ export default async function AdminDashboardPage() {
         renter: b.renter_name,
         dress: b.dress_name ?? "Dress",
         dressId: b.dress_id,
+        size: b.size,
         contact: b.contact,
         address: b.address,
         paymentMethod: b.payment_method,
@@ -309,6 +311,7 @@ export default async function AdminDashboardPage() {
         amount: b.amount ?? 0,
         status: b.payment_status,
         manual: b.manual,
+        washRelease: (b.wash_release ?? "none") as "none" | "admin" | "public",
         bookedAt: b.created_at,
         proofUrl,
         idPhotoUrl,
@@ -380,6 +383,7 @@ export default async function AdminDashboardPage() {
     .map((b) => ({
       id: b.id,
       dress: b.dress,
+      size: b.size,
       renter: b.renter,
       start: b.start as string,
       end: b.end as string,
@@ -396,6 +400,8 @@ export default async function AdminDashboardPage() {
     .map((h) => ({
       id: h.id,
       dress: h.dress_name ?? "Dress",
+      // rental_history predates per-size inventory and records no size.
+      size: null,
       renter: h.renter_name,
       start: h.start_date,
       end: h.end_date,
@@ -475,6 +481,7 @@ export default async function AdminDashboardPage() {
     id: b.id,
     renter: b.renter,
     dress: b.dress,
+    size: b.size,
     start: b.start as string,
     end: b.end as string,
     amount: b.amount,
@@ -504,6 +511,8 @@ export default async function AdminDashboardPage() {
     id: d.id,
     name: d.name,
     price: d.price,
+    // One garment per size: the manual-booking form picks a unit, not a dress.
+    sizes: d.sizes.map((s) => s.size),
   }));
 
   // Stacked sections on one page. The anchor ids (#calendar, #bookings, …) are
